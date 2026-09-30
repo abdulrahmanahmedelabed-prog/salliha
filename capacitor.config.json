@@ -1,0 +1,6 @@
+{
+  "appId": "com.salliha.app",
+  "appName": "صلّحها",
+  "webDir": "www",
+  "android": { "backgroundColor": "#f4f1ea" }
+}

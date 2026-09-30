@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12372a">
+  <meta name="description" content="إدارة طلبات صيانة الأجهزة للمحلات الصغيرة">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+  <title>صلّحها</title>
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="logo">ص</span><strong>صلّحها</strong><small>دفتر الصيانة الذكي</small></div>
+    <button id="installBtn" class="ghost" hidden>تثبيت التطبيق</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><p class="eyebrow">عمل اليوم</p><h1>كل جهاز واضح، من الاستلام للتسليم.</h1></div>
+      <button id="newJobBtn" class="primary">＋ استلام جهاز</button>
+    </section>
+
+    <section class="stats" aria-label="ملخص العمل">
+      <article><span id="todayCount">0</span><small>استلام اليوم</small></article>
+      <article><span id="activeCount">0</span><small>قيد العمل</small></article>
+      <article><span id="readyCount">0</span><small>جاهز للتسليم</small></article>
+      <article><span id="dueTotal">0</span><small>مبالغ متبقية</small></article>
+    </section>
+
+    <section class="toolbar">
+      <input id="searchInput" type="search" placeholder="ابحث بالاسم، الهاتف، الجهاز أو رقم الطلب">
+      <select id="statusFilter" aria-label="تصفية حسب الحالة">
+        <option value="">كل الحالات</option>
+        <option>تم الاستلام</option><option>قيد الفحص</option><option>انتظار الموافقة</option>
+        <option>انتظار قطعة</option><option>قيد التصليح</option><option>جاهز</option><option>تم التسليم</option>
+      </select>
+    </section>
+
+    <section id="jobs" class="jobs" aria-live="polite"></section>
+    <section id="empty" class="empty"><div>🛠️</div><h2>ابدأ بأول جهاز</h2><p>سجّل الجهاز والعطل، ثم تابع حالته وأرسل التحديث للعميل.</p></section>
+  </main>
+
+  <dialog id="jobDialog">
+    <form id="jobForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">بطاقة صيانة</p><h2 id="dialogTitle">استلام جهاز جديد</h2></div><button type="button" class="close" data-close>×</button></div>
+      <input id="jobId" type="hidden">
+      <div class="grid2">
+        <label>اسم العميل<input id="customer" required maxlength="80" autocomplete="name"></label>
+        <label>رقم الهاتف<input id="phone" required maxlength="24" inputmode="tel" autocomplete="tel" placeholder="٠٥٩... أو 059..."></label>
+        <label>نوع الجهاز<input id="device" required maxlength="100" placeholder="مثال: Samsung A52"></label>
+        <label>الرقم التسلسلي / IMEI<input id="serial" maxlength="80"></label>
+      </div>
+      <label>العطل كما وصفه العميل<textarea id="issue" required maxlength="600" rows="3"></textarea></label>
+      <div class="grid3">
+        <label>السعر المتوقع<input id="price" type="text" inputmode="decimal" value="0" placeholder="٠٫٠٠"></label>
+        <label>المدفوع<input id="paid" type="text" inputmode="decimal" value="0" placeholder="٠٫٠٠"></label>
+        <label>الحالة<select id="status"><option>تم الاستلام</option><option>قيد الفحص</option><option>انتظار الموافقة</option><option>انتظار قطعة</option><option>قيد التصليح</option><option>جاهز</option><option>تم التسليم</option></select></label>
+      </div>
+      <label>ملاحظات داخلية<textarea id="notes" maxlength="800" rows="2"></textarea></label>
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary" value="save">حفظ الطلب</button></div>
+    </form>
+  </dialog>
+
+  <template id="jobTemplate">
+    <article class="job-card">
+      <div class="job-top"><div><small class="job-number"></small><h3 class="job-device"></h3><p class="job-customer"></p></div><span class="status-pill"></span></div>
+      <p class="job-issue"></p>
+      <div class="money"><span>السعر <b class="job-price"></b></span><span>المتبقي <b class="job-due"></b></span></div>
+      <div class="card-actions"><button data-action="edit">تعديل</button><button data-action="whatsapp">واتساب</button><button data-action="print">إيصال</button><button data-action="delete" class="danger">حذف</button></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
