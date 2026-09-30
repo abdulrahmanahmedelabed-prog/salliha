@@ -4,71 +4,231 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#12372a">
-  <meta name="description" content="إدارة طلبات صيانة الأجهزة للمحلات الصغيرة">
+  <meta name="description" content="صلّحها — نظام متكامل لإدارة محلات صيانة الأجهزة">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="app.css">
   <title>صلّحها</title>
 </head>
 <body>
+  <div id="lock" class="lock" hidden>
+    <form id="lockForm" class="lock-box">
+      <span class="logo big">ص</span>
+      <h2 id="lockShop">صلّحها</h2>
+      <p>أدخل رمز الدخول</p>
+      <input id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" required>
+      <button class="primary">دخول</button>
+      <small id="lockErr" class="err"></small>
+    </form>
+  </div>
+
   <header class="topbar">
-    <div><span class="logo">ص</span><strong>صلّحها</strong><small>دفتر الصيانة الذكي</small></div>
-    <button id="installBtn" class="ghost" hidden>تثبيت التطبيق</button>
+    <div class="brand"><span class="logo">ص</span><div><strong id="shopTitle">صلّحها</strong><small>دفتر الصيانة الذكي</small></div></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="jobs" class="active"><span>🛠️</span>الطلبات</button>
+      <button data-tab="customers"><span>👥</span>العملاء</button>
+      <button data-tab="stock"><span>📦</span>المخزون</button>
+      <button data-tab="reports"><span>📊</span>التقارير</button>
+      <button data-tab="settings"><span>⚙️</span>الإعدادات</button>
+    </nav>
+    <button id="installBtn" class="ghost sm" hidden>تثبيت</button>
   </header>
 
   <main>
-    <section class="hero">
-      <div><p class="eyebrow">عمل اليوم</p><h1>كل جهاز واضح، من الاستلام للتسليم.</h1></div>
-      <button id="newJobBtn" class="primary">＋ استلام جهاز</button>
+    <section id="tab-jobs" class="tab">
+      <div class="hero">
+        <div><p class="eyebrow" id="todayLabel">عمل اليوم</p><h1>كل جهاز واضح، من الاستلام للتسليم.</h1></div>
+        <button id="newJobBtn" class="primary">＋ استلام جهاز <kbd>N</kbd></button>
+      </div>
+      <div class="stats">
+        <article data-quick="today"><span id="todayCount">0</span><small>استلام اليوم</small></article>
+        <article data-quick="active"><span id="activeCount">0</span><small>قيد العمل</small></article>
+        <article data-quick="ready"><span id="readyCount">0</span><small>جاهز للتسليم</small></article>
+        <article data-quick="late" class="warn"><span id="lateCount">0</span><small>متأخر عن الموعد</small></article>
+        <article data-quick="due"><span id="dueTotal">0</span><small>مبالغ متبقية</small></article>
+      </div>
+      <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="ابحث بالاسم، الهاتف، الجهاز، IMEI أو رقم الطلب  ( / )">
+        <select id="statusFilter" aria-label="الحالة"><option value="">كل الحالات</option></select>
+        <select id="techFilter" aria-label="الفني"><option value="">كل الفنيين</option></select>
+        <div class="seg" id="viewSeg"><button data-view="list" class="active">قائمة</button><button data-view="board">لوحة</button></div>
+      </div>
+      <p id="quickNote" class="quick-note" hidden></p>
+      <div id="jobs" class="jobs"></div>
+      <div id="board" class="board" hidden></div>
+      <div id="empty" class="empty" hidden><div>🛠️</div><h2>ابدأ بأول جهاز</h2><p>سجّل الجهاز والعطل، ثم تابع حالته وأرسل التحديث للعميل بضغطة.</p></div>
     </section>
 
-    <section class="stats" aria-label="ملخص العمل">
-      <article><span id="todayCount">0</span><small>استلام اليوم</small></article>
-      <article><span id="activeCount">0</span><small>قيد العمل</small></article>
-      <article><span id="readyCount">0</span><small>جاهز للتسليم</small></article>
-      <article><span id="dueTotal">0</span><small>مبالغ متبقية</small></article>
+    <section id="tab-customers" class="tab" hidden>
+      <div class="hero"><div><p class="eyebrow">قاعدة العملاء</p><h1>كل عميل وتاريخه معك.</h1></div><button id="newCustBtn" class="primary">＋ عميل</button></div>
+      <div class="toolbar"><input id="custSearch" type="search" placeholder="ابحث بالاسم أو الهاتف"></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>العميل</th><th>الهاتف</th><th>الطلبات</th><th>إجمالي المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody id="custRows"></tbody></table></div>
     </section>
 
-    <section class="toolbar">
-      <input id="searchInput" type="search" placeholder="ابحث بالاسم، الهاتف، الجهاز أو رقم الطلب">
-      <select id="statusFilter" aria-label="تصفية حسب الحالة">
-        <option value="">كل الحالات</option>
-        <option>تم الاستلام</option><option>قيد الفحص</option><option>انتظار الموافقة</option>
-        <option>انتظار قطعة</option><option>قيد التصليح</option><option>جاهز</option><option>تم التسليم</option>
-      </select>
+    <section id="tab-stock" class="tab" hidden>
+      <div class="hero"><div><p class="eyebrow">قطع الغيار</p><h1>اعرف ما عندك قبل أن ينفد.</h1></div><button id="newPartBtn" class="primary">＋ قطعة</button></div>
+      <div class="toolbar"><input id="partSearch" type="search" placeholder="ابحث باسم القطعة أو الكود"><label class="check"><input type="checkbox" id="lowOnly"> الناقص فقط</label></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>القطعة</th><th>الكود</th><th>الكمية</th><th>التكلفة</th><th>سعر البيع</th><th>قيمة المخزون</th><th></th></tr></thead><tbody id="partRows"></tbody></table></div>
     </section>
 
-    <section id="jobs" class="jobs" aria-live="polite"></section>
-    <section id="empty" class="empty"><div>🛠️</div><h2>ابدأ بأول جهاز</h2><p>سجّل الجهاز والعطل، ثم تابع حالته وأرسل التحديث للعميل.</p></section>
+    <section id="tab-reports" class="tab" hidden>
+      <div class="hero"><div><p class="eyebrow">الأداء</p><h1>أرقام محلك بوضوح.</h1></div>
+        <select id="period" class="auto"><option value="1">اليوم</option><option value="7">آخر 7 أيام</option><option value="30" selected>آخر 30 يوماً</option><option value="365">آخر سنة</option><option value="0">كل الوقت</option></select></div>
+      <div class="stats" id="kpis"></div>
+      <div class="report-grid">
+        <article class="panel wide"><h3>الإيراد اليومي</h3><div id="chart" class="chart"></div></article>
+        <article class="panel"><h3>الطلبات حسب الحالة</h3><div id="byStatus" class="bars"></div></article>
+        <article class="panel"><h3>أكثر الأجهزة</h3><div id="byDevice" class="bars"></div></article>
+        <article class="panel"><h3>أكثر الأعطال</h3><div id="byIssue" class="bars"></div></article>
+        <article class="panel"><h3>أداء الفنيين</h3><div id="byTech" class="bars"></div></article>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab" hidden>
+      <div class="hero"><div><p class="eyebrow">الإعدادات</p><h1>اضبط المحل على مقاسك.</h1></div></div>
+      <form id="settingsForm" class="settings">
+        <fieldset><legend>بيانات المحل (تظهر على الإيصال)</legend>
+          <div class="grid2">
+            <label>اسم المحل<input name="shopName" maxlength="60"></label>
+            <label>هاتف المحل<input name="shopPhone" maxlength="30" inputmode="tel"></label>
+            <label>العنوان<input name="shopAddress" maxlength="120"></label>
+            <label>العملة<input name="currency" maxlength="8" placeholder="₪ أو ر.س أو $"></label>
+            <label>رمز الدولة لواتساب<input name="countryCode" maxlength="4" inputmode="numeric" placeholder="970"></label>
+            <label>الضمان الافتراضي (أيام)<input name="warrantyDays" type="number" min="0" max="3650"></label>
+            <label>حجم الإيصال<select name="receiptSize"><option value="80">طابعة حرارية 80مم</option><option value="58">طابعة حرارية 58مم</option><option value="a4">A4</option></select></label>
+            <label>الفنيون (افصل بفاصلة)<input name="techs" placeholder="أحمد، محمد"></label>
+          </div>
+          <label>شروط الإيصال<textarea name="terms" rows="3"></textarea></label>
+        </fieldset>
+        <fieldset><legend>رسائل واتساب لكل حالة</legend>
+          <p class="hint">متغيرات: {الاسم} {الرقم} {الجهاز} {الحالة} {المتبقي} {المحل} {الموعد}</p>
+          <div id="tplFields"></div>
+        </fieldset>
+        <fieldset><legend>الأمان</legend>
+          <label>رمز دخول التطبيق — اتركه فارغاً لإبقاء الحالي، واكتب 0 لإلغائه<input name="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password" placeholder="••••"></label>
+        </fieldset>
+        <div class="actions"><button class="primary">حفظ الإعدادات</button></div>
+      </form>
+      <fieldset class="settings"><legend>النسخ الاحتياطي والبيانات</legend>
+        <p class="hint" id="backupHint">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية أسبوعياً.</p>
+        <div class="actions start">
+          <button id="exportBtn" class="primary">⬇ نسخة احتياطية كاملة</button>
+          <label class="ghost button">⬆ استرجاع نسخة<input id="importFile" type="file" accept="application/json,.json" hidden></label>
+          <button id="csvBtn" class="ghost">تصدير الطلبات إلى Excel</button>
+          <button id="demoBtn" class="ghost">إضافة بيانات تجريبية</button>
+          <button id="wipeBtn" class="ghost danger">مسح كل البيانات</button>
+        </div>
+      </fieldset>
+      <p class="about">صلّحها <span id="version"></span> — يعمل دون إنترنت. اختصارات: <kbd>N</kbd> طلب جديد، <kbd>/</kbd> بحث، <kbd>Esc</kbd> إغلاق.</p>
+    </section>
   </main>
 
-  <dialog id="jobDialog">
-    <form id="jobForm" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">بطاقة صيانة</p><h2 id="dialogTitle">استلام جهاز جديد</h2></div><button type="button" class="close" data-close>×</button></div>
+  <dialog id="jobDialog" class="wide">
+    <form id="jobForm" method="dialog" novalidate>
+      <div class="dialog-head"><div><p class="eyebrow" id="jobNumLabel">بطاقة صيانة</p><h2 id="dialogTitle">استلام جهاز جديد</h2></div><button type="button" class="close" data-close>×</button></div>
       <input id="jobId" type="hidden">
-      <div class="grid2">
-        <label>اسم العميل<input id="customer" required maxlength="80" autocomplete="name"></label>
-        <label>رقم الهاتف<input id="phone" required maxlength="24" inputmode="tel" autocomplete="tel" placeholder="٠٥٩... أو 059..."></label>
-        <label>نوع الجهاز<input id="device" required maxlength="100" placeholder="مثال: Samsung A52"></label>
-        <label>الرقم التسلسلي / IMEI<input id="serial" maxlength="80"></label>
+      <div class="dtabs" id="dtabs"><button type="button" data-d="d-info" class="active">الجهاز والعميل</button><button type="button" data-d="d-check">الفحص والتوقيع</button><button type="button" data-d="d-money">القطع والدفعات</button><button type="button" data-d="d-log">السجل</button></div>
+
+      <div class="dpane" id="d-info">
+        <div class="grid2">
+          <label>رقم الهاتف *<input id="phone" required maxlength="24" inputmode="tel" autocomplete="off" list="custList" placeholder="059..."></label>
+          <label>اسم العميل *<input id="customer" required maxlength="80" autocomplete="off"></label>
+          <label>نوع الجهاز *<input id="device" required maxlength="100" list="deviceList" placeholder="مثال: Samsung A52"></label>
+          <label>الرقم التسلسلي / IMEI<input id="serial" maxlength="80"></label>
+        </div>
+        <p id="warrantyHint" class="badge-line" hidden></p>
+        <label>العطل كما وصفه العميل *<textarea id="issue" required maxlength="600" rows="2"></textarea></label>
+        <div class="chips" id="issueChips"></div>
+        <div class="grid4">
+          <label>الحالة<select id="status"></select></label>
+          <label>الأولوية<select id="priority"><option>عادي</option><option>مستعجل</option></select></label>
+          <label>الفني<select id="tech"><option value="">—</option></select></label>
+          <label>موعد التسليم<input id="dueAt" type="date"></label>
+        </div>
+        <div class="grid3">
+          <label>السعر المتفق عليه<input id="price" inputmode="decimal" placeholder="0"></label>
+          <label id="depositWrap">عربون الآن<input id="deposit" inputmode="decimal" placeholder="0"></label>
+          <label>الضمان (أيام)<input id="warrantyDays" type="number" min="0" max="3650"></label>
+        </div>
       </div>
-      <label>العطل كما وصفه العميل<textarea id="issue" required maxlength="600" rows="3"></textarea></label>
-      <div class="grid3">
-        <label>السعر المتوقع<input id="price" type="text" inputmode="decimal" value="0" placeholder="٠٫٠٠"></label>
-        <label>المدفوع<input id="paid" type="text" inputmode="decimal" value="0" placeholder="٠٫٠٠"></label>
-        <label>الحالة<select id="status"><option>تم الاستلام</option><option>قيد الفحص</option><option>انتظار الموافقة</option><option>انتظار قطعة</option><option>قيد التصليح</option><option>جاهز</option><option>تم التسليم</option></select></label>
+
+      <div class="dpane" id="d-check" hidden>
+        <h4>المستلم مع الجهاز</h4>
+        <div class="chips toggle" id="accChips"></div>
+        <h4>حالة الجهاز عند الاستلام</h4>
+        <div class="chips toggle" id="condChips"></div>
+        <div class="grid2">
+          <label>رمز القفل / النمط<input id="passcode" maxlength="40" autocomplete="off" placeholder="مثال: 1234"></label>
+          <label>ملاحظات داخلية (لا تظهر للعميل)<input id="notes" maxlength="800"></label>
+        </div>
+        <h4>صور الجهاز</h4>
+        <div class="photos" id="photos"><label class="add-photo">📷<br>إضافة<input id="photoInput" type="file" accept="image/*" multiple hidden></label></div>
+        <h4>توقيع العميل</h4>
+        <div class="sig"><canvas id="sigPad" width="600" height="160"></canvas><button type="button" class="ghost sm" id="sigClear">مسح التوقيع</button></div>
       </div>
-      <label>ملاحظات داخلية<textarea id="notes" maxlength="800" rows="2"></textarea></label>
-      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary" value="save">حفظ الطلب</button></div>
+
+      <div class="dpane" id="d-money" hidden>
+        <h4>القطع المستخدمة</h4>
+        <div class="row-add"><input id="partPick" list="partList" placeholder="اختر قطعة من المخزون أو اكتب اسماً"><input id="partQty" type="number" min="1" value="1" class="n"><input id="partCostIn" inputmode="decimal" placeholder="التكلفة" class="n2"><button type="button" class="ghost" id="addPartBtn">إضافة</button></div>
+        <table class="table mini"><thead><tr><th>القطعة</th><th>الكمية</th><th>التكلفة</th><th></th></tr></thead><tbody id="usedRows"></tbody></table>
+        <h4>الدفعات</h4>
+        <div class="row-add"><input id="payAmount" inputmode="decimal" placeholder="المبلغ"><select id="payMethod" class="auto"><option>نقداً</option><option>تحويل</option><option>بطاقة</option><option>محفظة</option></select><button type="button" class="ghost" id="addPayBtn">تسجيل دفعة</button><button type="button" class="ghost" id="payRestBtn">سداد الباقي</button></div>
+        <table class="table mini"><thead><tr><th>التاريخ</th><th>الطريقة</th><th>المبلغ</th><th></th></tr></thead><tbody id="payRows"></tbody></table>
+        <div class="summary" id="moneySummary"></div>
+      </div>
+
+      <div class="dpane" id="d-log" hidden>
+        <ol class="timeline" id="timeline"></ol>
+        <div class="row-add"><input id="logNote" maxlength="200" placeholder="أضف ملاحظة للسجل"><button type="button" class="ghost" id="addLogBtn">إضافة</button></div>
+      </div>
+
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button type="button" class="ghost" id="saveAndPrint">حفظ وطباعة</button><button class="primary" id="saveBtn">حفظ الطلب</button></div>
     </form>
   </dialog>
 
+  <dialog id="custDialog" class="wide">
+    <form id="custForm" method="dialog">
+      <div class="dialog-head"><h2 id="custTitle">عميل</h2><button type="button" class="close" data-close>×</button></div>
+      <input id="custId" type="hidden">
+      <div class="grid2"><label>الاسم<input id="custName" required maxlength="80"></label><label>الهاتف<input id="custPhone" required maxlength="24" inputmode="tel"></label></div>
+      <label>ملاحظات<input id="custNotes" maxlength="200"></label>
+      <div id="custHistory"></div>
+      <div class="actions"><button type="button" class="ghost" data-close>إغلاق</button><button type="button" class="ghost" id="custNewJob">طلب جديد لهذا العميل</button><button class="primary">حفظ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="partDialog">
+    <form id="partForm" method="dialog">
+      <div class="dialog-head"><h2>قطعة غيار</h2><button type="button" class="close" data-close>×</button></div>
+      <input id="partId" type="hidden">
+      <div class="grid2">
+        <label>الاسم<input id="partName" required maxlength="80" placeholder="شاشة A52 أصلية"></label>
+        <label>الكود / SKU<input id="partSku" maxlength="40"></label>
+        <label>الكمية<input id="partStock" type="number" min="0" required></label>
+        <label>تنبيه عند أقل من<input id="partMin" type="number" min="0"></label>
+        <label>التكلفة<input id="partCost" inputmode="decimal"></label>
+        <label>سعر البيع<input id="partPrice" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary">حفظ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="photoView" class="photo-view"><form method="dialog"><button class="close">×</button></form><img alt="صورة الجهاز"></dialog>
+
+  <datalist id="custList"></datalist><datalist id="deviceList"></datalist><datalist id="partList"></datalist>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="printRoot" class="print-root"></div>
+
   <template id="jobTemplate">
     <article class="job-card">
-      <div class="job-top"><div><small class="job-number"></small><h3 class="job-device"></h3><p class="job-customer"></p></div><span class="status-pill"></span></div>
+      <div class="job-top"><div><small class="job-number"></small><h3 class="job-device"></h3><p class="job-customer"></p></div><div class="tags"><span class="status-pill"></span></div></div>
       <p class="job-issue"></p>
-      <div class="money"><span>السعر <b class="job-price"></b></span><span>المتبقي <b class="job-due"></b></span></div>
-      <div class="card-actions"><button data-action="edit">تعديل</button><button data-action="whatsapp">واتساب</button><button data-action="print">إيصال</button><button data-action="delete" class="danger">حذف</button></div>
+      <div class="meta"></div>
+      <div class="money"><span>السعر<b class="job-price"></b></span><span>المدفوع<b class="job-paid"></b></span><span>المتبقي<b class="job-due"></b></span></div>
+      <div class="card-actions">
+        <select data-action="status" aria-label="تغيير الحالة"></select>
+        <button data-action="edit">فتح</button><button data-action="whatsapp">واتساب</button><button data-action="print">إيصال</button><button data-action="label">ملصق</button><button data-action="delete" class="danger" title="حذف">🗑</button>
+      </div>
     </article>
   </template>
 

@@ -1,10 +1,12 @@
-name: Salliha apps (Windows + Android)
+name: Build & Release (Windows + Android)
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -18,8 +20,10 @@ jobs:
         env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
       - uses: actions/upload-artifact@v4
         with:
-          name: salliha-windows
-          path: dist/*.exe
+          name: windows
+          path: |
+            dist/Salliha-Setup.exe
+            dist/Salliha-Portable.exe
 
   android:
     runs-on: ubuntu-latest
@@ -32,12 +36,37 @@ jobs:
       - run: npm install
       - run: npm run icons
       - run: npx cap add android
-      - run: npx capacitor-assets generate --android --iconBackgroundColor '#12372a' --splashBackgroundColor '#f4f1ea'
+      - run: cp native/android/MainActivity.java android/app/src/main/java/com/salliha/app/MainActivity.java
+      - run: npx capacitor-assets generate --android --iconBackgroundColor '#12372a' --splashBackgroundColor '#f4f7f5'
       - run: npx cap sync android
       - run: ./gradlew assembleDebug
         working-directory: android
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk salliha.apk
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Salliha.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: salliha-android
-          path: salliha.apk
+          name: android
+          path: Salliha.apk
+
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - id: v
+        run: echo "tag=v$(node -p "require('./package.json').version").${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: صلّحها ${{ steps.v.outputs.tag }}
+          make_latest: true
+          body: |
+            ### التنزيل
+            - **Windows (تثبيت):** Salliha-Setup.exe
+            - **Windows (بدون تثبيت):** Salliha-Portable.exe
+            - **Android:** Salliha.apk
+          files: |
+            out/Salliha-Setup.exe
+            out/Salliha-Portable.exe
+            out/Salliha.apk

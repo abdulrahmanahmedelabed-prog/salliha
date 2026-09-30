@@ -1,7 +1,7 @@
 {
   "name": "salliha",
   "productName": "Salliha",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "صلّحها — إدارة طلبات صيانة الأجهزة",
   "main": "electron/main.js",
   "author": "Salliha",
@@ -9,17 +9,38 @@
   "scripts": {
     "start": "electron .",
     "icons": "node scripts/make-icon.js",
-    "dist:win": "npm run icons && electron-builder --win nsis portable",
+    "dist:win": "npm run icons && electron-builder --win --publish never",
     "android:add": "cap add android",
     "android:sync": "cap sync android"
   },
   "build": {
     "appId": "com.salliha.app",
     "productName": "Salliha",
-    "files": ["electron/**", "www/**", "build/icon.png"],
-    "directories": { "output": "dist" },
-    "win": { "icon": "build/icon.png", "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "shortcutName": "صلّحها" }
+    "files": [
+      "electron/**",
+      "www/**",
+      "build/icon.png"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "صلّحها",
+      "artifactName": "Salliha-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "Salliha-Portable.${ext}"
+    },
+    "publish": null
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",

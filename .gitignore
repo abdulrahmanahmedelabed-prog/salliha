@@ -1,5 +1,5 @@
 node_modules/
 dist/
-build/
-assets/
-android/
+/build/
+/assets/
+/android/
