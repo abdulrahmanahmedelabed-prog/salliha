@@ -26,6 +26,7 @@
     <div class="brand"><span class="logo">ص</span><div><strong id="shopTitle">صلّحها</strong><small>دفتر الصيانة الذكي</small></div></div>
     <nav class="tabs" id="tabs">
       <button data-tab="jobs" class="active"><span>🛠️</span>الطلبات</button>
+      <button data-tab="cash"><span>💵</span>الصندوق</button>
       <button data-tab="customers"><span>👥</span>العملاء</button>
       <button data-tab="stock"><span>📦</span>المخزون</button>
       <button data-tab="reports"><span>📊</span>التقارير</button>
@@ -58,6 +59,14 @@
       <div id="jobs" class="jobs"></div>
       <div id="board" class="board" hidden></div>
       <div id="empty" class="empty" hidden><div>🛠️</div><h2>ابدأ بأول جهاز</h2><p>سجّل الجهاز والعطل، ثم تابع حالته وأرسل التحديث للعميل بضغطة.</p></div>
+    </section>
+
+    <section id="tab-cash" class="tab" hidden>
+      <div class="hero"><div><p class="eyebrow">الصندوق</p><h1>كل قرش داخل وخارج.</h1></div>
+        <div class="hero-actions"><input type="date" id="cashDate" class="auto" aria-label="اليوم"><button id="newSaleBtn" class="primary">＋ بيع</button><button id="newExpBtn" class="ghost">＋ مصروف</button><button id="zBtn" class="ghost">🖨 إغلاق اليوم</button></div></div>
+      <div class="stats" id="cashStats"></div>
+      <p class="hint" id="cashMethods"></p>
+      <div class="table-wrap"><table class="table"><thead><tr><th>الوقت</th><th>النوع</th><th>البيان</th><th>الطريقة</th><th>المبلغ</th><th></th></tr></thead><tbody id="cashRows"></tbody></table></div>
     </section>
 
     <section id="tab-customers" class="tab" hidden>
@@ -206,7 +215,7 @@
       <div class="grid2"><label>الاسم<input id="custName" required maxlength="80"></label><label>الهاتف<input id="custPhone" required maxlength="24" inputmode="tel"></label></div>
       <label>ملاحظات<input id="custNotes" maxlength="200"></label>
       <div id="custHistory"></div>
-      <div class="actions"><button type="button" class="ghost" data-close>إغلاق</button><button type="button" class="ghost" id="custNewJob">طلب جديد لهذا العميل</button><button class="primary">حفظ</button></div>
+      <div class="actions"><button type="button" class="ghost danger" id="custDelete">حذف العميل</button><button type="button" class="ghost" data-close>إغلاق</button><button type="button" class="ghost" id="custNewJob">طلب جديد لهذا العميل</button><button class="primary">حفظ</button></div>
     </form>
   </dialog>
 
@@ -221,6 +230,30 @@
         <label>تنبيه عند أقل من<input id="partMin" type="number" min="0"></label>
         <label>التكلفة<input id="partCost" inputmode="decimal"></label>
         <label>سعر البيع<input id="partPrice" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary">حفظ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="saleDialog" class="wide">
+    <form id="saleForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">بيع مباشر</p><h2>بيع قطع وإكسسوارات</h2></div><button type="button" class="close" data-close>×</button></div>
+      <div class="row-add"><input id="salePick" list="partList" placeholder="اختر من المخزون أو اكتب اسم الصنف"><input id="saleQty" type="number" min="1" value="1" class="n"><input id="salePrice" inputmode="decimal" placeholder="السعر" class="n2"><button type="button" class="ghost" id="saleAdd">إضافة</button></div>
+      <table class="table mini"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th><th></th></tr></thead><tbody id="saleRows"></tbody></table>
+      <div class="grid3"><label>العميل (اختياري)<input id="saleCustomer" maxlength="80"></label><label>طريقة الدفع<select id="saleMethod"><option>نقداً</option><option>تحويل</option><option>بطاقة</option><option>محفظة</option></select></label><label>خصم<input id="saleDiscount" inputmode="decimal" placeholder="0"></label></div>
+      <div class="summary" id="saleSummary"></div>
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button type="button" class="ghost" id="salePrint">حفظ وطباعة</button><button class="primary">حفظ البيع</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="expDialog">
+    <form id="expForm" method="dialog">
+      <div class="dialog-head"><h2>مصروف</h2><button type="button" class="close" data-close>×</button></div>
+      <div class="grid2">
+        <label>البند<select id="expCat"><option>مشتريات قطع</option><option>إيجار</option><option>كهرباء وإنترنت</option><option>رواتب</option><option>مواصلات</option><option>صيانة أدوات</option><option>أخرى</option></select></label>
+        <label>المبلغ<input id="expAmount" inputmode="decimal" required></label>
+        <label>طريقة الدفع<select id="expMethod"><option>نقداً</option><option>تحويل</option><option>بطاقة</option><option>محفظة</option></select></label>
+        <label>ملاحظة<input id="expNote" maxlength="120"></label>
       </div>
       <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary">حفظ</button></div>
     </form>

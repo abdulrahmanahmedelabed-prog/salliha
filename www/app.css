@@ -60,7 +60,7 @@ label.check input { width: auto; }
 .stats [data-quick]:hover { transform: translateY(-2px); border-color: #4b9270; }
 .stats article.sel { border-color: var(--green); box-shadow: 0 0 0 2px var(--green) inset; }
 .stats article.warn.on span { color: var(--danger); }
-.stats span { display: block; font-weight: 900; font-size: 26px; }
+.stats span { display: block; font-weight: 900; font-size: 26px; overflow-wrap: anywhere; }
 .stats small { color: var(--muted); }
 
 .toolbar { display: flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
@@ -175,13 +175,15 @@ dialog h4 { margin: 8px 0 0; }
 
 /* التقارير */
 .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
+.report-grid > *, .stats > * { min-width: 0; }
 .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
 .panel.wide { grid-column: 1/-1; }
 .panel h3 { margin: 0 0 12px; font-size: 16px; }
 .chart { display: flex; align-items: flex-end; gap: 4px; height: 200px; }
 .col-bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
 .col-bar i { width: 100%; max-width: 38px; height: var(--h); min-height: 2px; background: linear-gradient(var(--green2), var(--green)); border-radius: 6px 6px 2px 2px; }
-.col-bar small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.col-bar small { font-size: 10px; color: var(--muted); white-space: nowrap; max-width: 100%; overflow: hidden; }
+.chart.dense .col-bar:nth-child(odd) small { visibility: hidden; }
 .bars { display: flex; flex-direction: column; gap: 8px; }
 .bar { display: grid; grid-template-columns: 110px 1fr 70px; gap: 10px; align-items: center; font-size: 13px; }
 .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -196,6 +198,12 @@ legend { font-weight: 800; padding: 0 6px; }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
 .about { color: var(--muted); font-size: 13px; text-align: center; }
 .about kbd { background: var(--soft); border-color: var(--line); }
+
+/* الصندوق */
+.hero-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.kind { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.kind.in { background: #d1fadf; color: #05603a; } .kind.sale { background: #e0eaff; color: #2f47a8; } .kind.out { background: #fee4e2; color: #912018; }
+.amount-out { color: var(--danger); }
 
 /* المزامنة */
 .sync-badge { border: 0; background: var(--soft); border-radius: 99px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
@@ -218,8 +226,8 @@ legend { font-weight: 800; padding: 0 6px; }
   .topbar { min-height: 56px; }
   .brand small { display: none; }
   .tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; background: var(--paper); border-top: 1px solid var(--line); justify-content: space-around; padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); margin: 0; }
-  .tabs button { flex-direction: column; gap: 0; font-size: 11px; padding: 6px 4px; flex: 1; }
-  .tabs button span { font-size: 20px; }
+  .tabs button { flex-direction: column; gap: 0; font-size: 11px; padding: 6px 2px; flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
+  .tabs button span { font-size: 19px; }
   main { padding: 16px 12px 100px; }
   .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
   .stats { grid-template-columns: repeat(2, 1fr); }
@@ -230,6 +238,11 @@ legend { font-weight: 800; padding: 0 6px; }
   .grid4 { grid-template-columns: repeat(2, 1fr); }
   .toolbar select { flex: 1; }
   .hero .primary { width: 100%; }
+  .hero-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .hero-actions input { grid-column: 1 / -1; }
+  #tab-cash th:nth-child(4), #cashRows td:nth-child(4) { display: none; }
+  #cashRows td:first-child { white-space: nowrap; }
+  .table th, .table td { padding: 9px 8px; }
   kbd { display: none; }
   dialog, dialog.wide { inset: 0; width: 100%; max-width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; margin: 0; }
   .stats article:last-child:nth-child(odd) { grid-column: 1/-1; }

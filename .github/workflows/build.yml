@@ -9,7 +9,19 @@ permissions:
   contents: write
 
 jobs:
+  # لا يُبنى ولا يُنشر أي إصدار إلا إذا نجحت كل الاختبارات.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-save playwright@1
+      - run: npx playwright install --with-deps chromium
+      - run: node --no-warnings --test tests/*.test.js
+
   windows:
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +38,7 @@ jobs:
             dist/Salliha-Portable.exe
 
   android:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +52,26 @@ jobs:
       - run: cp native/android/MainActivity.java android/app/src/main/java/com/salliha/app/MainActivity.java
       - run: npx capacitor-assets generate --android --iconBackgroundColor '#12372a' --splashBackgroundColor '#f4f7f5'
       - run: npx cap sync android
-      - run: ./gradlew assembleDebug
+      - name: Set app version
+        run: |
+          V=$(node -p "require('./package.json').version")
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+      - run: ./gradlew assembleRelease
         working-directory: android
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Salliha.apk
+      # توقيع ثابت بين الإصدارات حتى يُحدَّث التطبيق فوق القديم دون فقد البيانات.
+      # يُفضَّل ضبط الأسرار ANDROID_KEYSTORE_B64 و ANDROID_KEYSTORE_PASSWORD؛ وإلا يُستخدم المفتاح المرفق بالمستودع.
+      - name: Sign APK
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > ks.jks; PASS="$KS_PASS"; else cp native/android/salliha.keystore ks.jks; PASS=salliha-app; fi
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/zipalign -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          $BT/apksigner sign --ks ks.jks --ks-pass "pass:$PASS" --ks-key-alias salliha --out Salliha.apk aligned.apk
+          $BT/apksigner verify --print-certs Salliha.apk | head -3
+          rm ks.jks
       - uses: actions/upload-artifact@v4
         with:
           name: android

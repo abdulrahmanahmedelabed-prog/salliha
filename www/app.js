@@ -1,7 +1,7 @@
 "use strict";
 /* صلّحها — نظام إدارة محلات الصيانة. يعمل دون إنترنت، والبيانات في IndexedDB على الجهاز. */
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const STATUSES = ["تم الاستلام", "قيد الفحص", "انتظار الموافقة", "انتظار قطعة", "قيد التصليح", "جاهز", "تم التسليم", "أُعيد دون تصليح"];
 const CLOSED = ["تم التسليم", "أُعيد دون تصليح"];
 const STATUS_CLASS = ["s-new", "s-check", "s-wait", "s-wait", "s-work", "s-ready", "s-done", "s-back"];
@@ -85,7 +85,8 @@ const db = {
   clear: () => db.tx("readwrite", (s) => s.clear())
 };
 
-let state = { v: 2, jobs: [], customers: [], parts: [], settings: { ...DEFAULT_SETTINGS } };
+const emptyState = () => ({ v: 2, jobs: [], customers: [], parts: [], sales: [], expenses: [] });
+let state = { ...emptyState(), settings: { ...DEFAULT_SETTINGS } };
 let saving = Promise.resolve();
 function persist(fromSync = false) {
   saving = saving.then(() => db.set("state", state)).catch((e) => toast("تعذّر الحفظ: " + e.message, true));
@@ -101,6 +102,7 @@ async function loadState() {
   } catch (e) {
     toast("تعذّر فتح قاعدة البيانات", true);
   }
+  state = { ...emptyState(), ...state };
   state.settings = { ...DEFAULT_SETTINGS, ...state.settings };
   state.jobs.forEach(normalizeJob);
 }
@@ -133,13 +135,15 @@ async function migrateV1() {
   toast(`تم نقل ${old.length} طلباً من النسخة السابقة`);
 }
 
+// S-2026-0012 للجهاز الأول، و S-2026-2-0012 للجهاز الثاني في المزامنة… فلا يتكرر رقم بين جهازين.
 function nextNumber() {
-  const year = new Date().getFullYear();
+  const year = new Date().getFullYear(), code = state.sync?.key && state.sync.code > 1 ? state.sync.code : 0;
   const max = state.jobs.reduce((m, j) => {
-    const [, y, n] = String(j.number).split("-");
-    return Number(y) === year ? Math.max(m, Number(n) || 0) : m;
+    const p = String(j.number).split("-");
+    const y = Number(p[1]), c = p.length === 4 ? Number(p[2]) : 0, n = Number(p[p.length - 1]);
+    return y === year && c === code ? Math.max(m, n || 0) : m;
   }, 0);
-  return `S-${year}-${String(max + 1).padStart(4, "0")}`;
+  return `S-${year}-${code ? code + "-" : ""}${String(max + 1).padStart(4, "0")}`;
 }
 
 function upsertCustomer(name, phone) {
@@ -175,7 +179,7 @@ function showTab(tab) {
   window.scrollTo({ top: 0 });
 }
 function renderTab() {
-  ({ jobs: renderJobs, customers: renderCustomers, stock: renderParts, reports: renderReports, settings: renderSettings })[currentTab]();
+  ({ jobs: renderJobs, cash: renderCash, customers: renderCustomers, stock: renderParts, reports: renderReports, settings: renderSettings })[currentTab]();
 }
 function refreshLists() {
   $("custList").innerHTML = state.customers.map((c) => `<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join("");
@@ -583,7 +587,7 @@ function openCustomer(c) {
   $("custId").value = c?.id || "";
   $("custTitle").textContent = c ? c.name : "عميل جديد";
   $("custName").value = c?.name || ""; $("custPhone").value = c?.phone || ""; $("custNotes").value = c?.notes || "";
-  $("custNewJob").hidden = !c;
+  $("custNewJob").hidden = !c; $("custDelete").hidden = !c;
   if (c) {
     const { jobs, paid, due } = customerStats(c);
     $("custHistory").innerHTML = `<div class="summary"><span>الطلبات<b>${jobs.length}</b></span><span>المدفوع<b>${money(paid)}</b></span><span>المتبقي<b class="${due > 0 ? "owe" : ""}">${money(due)}</b></span></div>
@@ -627,13 +631,16 @@ function renderReports() {
   const received = state.jobs.filter((j) => inP(j.createdAt));
   const delivered = state.jobs.filter((j) => j.status === "تم التسليم" && inP(j.deliveredAt));
   const pays = state.jobs.flatMap((j) => j.payments).filter((p) => inP(p.at));
-  const revenue = pays.reduce((s, p) => s + p.amount, 0);
-  const cost = delivered.reduce((s, j) => s + partsCost(j), 0);
+  const sales = state.sales.filter((x) => inP(x.at)), expenses = state.expenses.filter((x) => inP(x.at));
+  const salesTotal = sales.reduce((s, x) => s + x.total, 0), salesCost = sales.reduce((s, x) => s + saleCost(x), 0);
+  const expTotal = expenses.reduce((s, x) => s + x.amount, 0);
+  const revenue = pays.reduce((s, p) => s + p.amount, 0) + salesTotal;
+  const cost = delivered.reduce((s, j) => s + partsCost(j), 0) + salesCost;
   const tat = delivered.length ? delivered.reduce((s, j) => s + (new Date(j.deliveredAt) - new Date(j.createdAt)), 0) / delivered.length / DAY : 0;
   const outstanding = state.jobs.filter((j) => j.status !== "أُعيد دون تصليح").reduce((s, j) => s + dueOf(j), 0);
   const avgTicket = delivered.length ? delivered.reduce((s, j) => s + j.price, 0) / delivered.length : 0;
-  const kpi = [["أجهزة مستلمة", received.length], ["تم تسليمها", delivered.length], ["الإيراد المحصّل", money(revenue)], ["تكلفة القطع", money(cost)],
-    ["صافي الربح التقريبي", money(revenue - cost)], ["متوسط الفاتورة", money(avgTicket)], ["متوسط مدة التصليح", tat ? tat.toFixed(1) + " يوم" : "—"], ["ديون لدى العملاء", money(outstanding)]];
+  const kpi = [["أجهزة مستلمة", received.length], ["تم تسليمها", delivered.length], ["الإيراد المحصّل", money(revenue)], ["تكلفة القطع والبضاعة", money(cost)], ["المصروفات", money(expTotal)],
+    ["صافي الربح", money(revenue - cost - expTotal)], ["مبيعات مباشرة", money(salesTotal)], ["متوسط الفاتورة", money(avgTicket)], ["متوسط مدة التصليح", tat ? tat.toFixed(1) + " يوم" : "—"], ["ديون لدى العملاء", money(outstanding)]];
   $("kpis").innerHTML = kpi.map(([k, v]) => `<article><span>${v}</span><small>${k}</small></article>`).join("");
 
   // الرسم البياني: يومي حتى 31 يوماً، وإلا شهري لآخر 12 شهراً.
@@ -644,9 +651,10 @@ function renderReports() {
   } else {
     buckets = Array.from({ length: 12 }, (_, i) => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); d.setMonth(d.getMonth() - 11 + i); const e = new Date(d); e.setMonth(e.getMonth() + 1); return { label: d.toLocaleDateString("ar", { month: "short" }), from: d, to: e }; });
   }
-  const all = state.jobs.flatMap((j) => j.payments);
+  const all = state.jobs.flatMap((j) => j.payments).concat(state.sales.map((x) => ({ at: x.at, amount: x.total })));
   buckets.forEach((b) => (b.v = all.filter((p) => { const t = new Date(p.at); return t >= b.from && t < b.to; }).reduce((s, p) => s + p.amount, 0)));
   const max = Math.max(1, ...buckets.map((b) => b.v));
+  $("chart").classList.toggle("dense", buckets.length > 14);
   $("chart").innerHTML = buckets.map((b) => `<div class="col-bar" title="${esc(b.label)}: ${money(b.v)}"><i style="--h:${(b.v / max) * 100}%"></i><small>${esc(b.label)}</small></div>`).join("");
 
   bars($("byStatus"), STATUSES.map((s) => [s, state.jobs.filter((j) => j.status === s && (!isClosed(j) || inP(j.updatedAt))).length]).filter((e) => e[1]));
@@ -705,7 +713,7 @@ async function importBackup(file) {
   await db.clear();
   for (const [id, url] of Object.entries(data.photos || {})) if (url) await db.set("photo:" + id, url);
   const keepSync = state.sync;
-  state = { v: 2, jobs: [], customers: [], parts: [], ...data.state, sync: keepSync };
+  state = { ...emptyState(), ...data.state, sync: keepSync };
   state.settings = { ...DEFAULT_SETTINGS, ...state.settings };
   state.jobs.forEach(normalizeJob);
   photoCache.clear();
@@ -902,6 +910,56 @@ function bind() {
     await persist(); $("custDialog").close(); refreshLists(); renderCustomers(); toast("تم حفظ العميل");
   });
 
+  // الصندوق
+  $("cashDate").addEventListener("change", renderCash);
+  $("newSaleBtn").addEventListener("click", openSale);
+  $("newExpBtn").addEventListener("click", () => { $("expForm").reset(); $("expDialog").showModal(); $("expAmount").focus(); });
+  $("zBtn").addEventListener("click", printZ);
+  $("cashRows").addEventListener("click", async (e) => {
+    const b = e.target.closest("button.x");
+    if (b) {
+      if (b.dataset.sale) {
+        const x = state.sales.find((y) => y.id === b.dataset.sale);
+        if (!confirm("حذف عملية البيع؟ ستعود الأصناف إلى المخزون.")) return;
+        adjustStock(x.items, []); state.sales = state.sales.filter((y) => y !== x);
+      } else {
+        if (!confirm("حذف المصروف؟")) return;
+        state.expenses = state.expenses.filter((y) => y.id !== b.dataset.exp);
+      }
+      await persist(); refreshLists(); renderCash(); return;
+    }
+    const tr = e.target.closest("[data-job]");
+    if (tr) openJob(state.jobs.find((j) => j.id === tr.dataset.job));
+  });
+  $("salePick").addEventListener("change", () => { const p = state.parts.find((x) => x.name === $("salePick").value); if (p) $("salePrice").value = p.price || ""; });
+  $("saleAdd").addEventListener("click", () => {
+    const name = $("salePick").value.trim(); if (!name) return $("salePick").focus();
+    const qty = Math.max(1, Math.round(num($("saleQty").value)) || 1), part = state.parts.find((p) => p.name === name);
+    const price = $("salePrice").value ? num($("salePrice").value) : part?.price || 0;
+    if (!price) { $("salePrice").focus(); return toast("أدخل السعر", true); }
+    if (part && part.stock < qty && !confirm(`المتوفر من "${name}" هو ${part.stock} فقط. متابعة؟`)) return;
+    saleDraft.push({ partId: part?.id || null, name, qty, price, cost: part?.cost || 0 });
+    $("salePick").value = ""; $("saleQty").value = 1; $("salePrice").value = ""; renderSale(); $("salePick").focus();
+  });
+  $("saleRows").addEventListener("click", (e) => { const i = e.target.dataset.i; if (i != null) { saleDraft.splice(i, 1); renderSale(); } });
+  $("saleDiscount").addEventListener("input", renderSale);
+  $("saleForm").addEventListener("submit", (e) => { e.preventDefault(); saveSale(false); });
+  $("salePrint").addEventListener("click", () => saveSale(true));
+  $("expForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const amount = num($("expAmount").value); if (!amount) return $("expAmount").focus();
+    state.expenses.push({ id: uid(), at: now(), category: $("expCat").value, amount, method: $("expMethod").value, note: $("expNote").value.trim() });
+    await persist(); $("expDialog").close(); renderCash(); toast("تم تسجيل المصروف");
+  });
+  $("custDelete").addEventListener("click", async () => {
+    const c = state.customers.find((x) => x.id === $("custId").value); if (!c) return;
+    const n = customerStats(c).jobs.length;
+    if (n) return toast(`لا يمكن حذف عميل له ${n} طلبات`, true);
+    if (!confirm(`حذف العميل ${c.name}؟`)) return;
+    state.customers = state.customers.filter((x) => x !== c);
+    await persist(); $("custDialog").close(); refreshLists(); renderCustomers();
+  });
+
   // المخزون
   $("partSearch").addEventListener("input", renderParts);
   $("lowOnly").addEventListener("change", renderParts);
@@ -962,7 +1020,7 @@ function bind() {
     if (!confirm("مسح كل الطلبات والعملاء والمخزون والصور نهائياً؟" + (syncOn() ? "\n⚠️ المزامنة مفعّلة: ستُحذف من كل الأجهزة المرتبطة أيضاً." : ""))) return;
     if (prompt('للتأكيد اكتب: مسح') !== "مسح") return;
     await db.clear();
-    state = { v: 2, jobs: [], customers: [], parts: [], settings: state.settings, sync: state.sync };
+    state = { ...emptyState(), settings: state.settings, sync: state.sync };
     await persist(); refreshLists(); renderTab(); toast("تم مسح البيانات");
   });
 
@@ -980,6 +1038,71 @@ function bind() {
   window.addEventListener("afterprint", () => { $("printRoot").innerHTML = ""; });
 }
 
+
+
+/* ---------- الصندوق: مبيعات مباشرة ومصروفات وإغلاق اليوم ---------- */
+const saleCost = (x) => x.items.reduce((s, i) => s + (i.cost || 0) * i.qty, 0);
+const saleSub = (items) => items.reduce((s, i) => s + i.price * i.qty, 0);
+const dayKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+
+function cashEntries(day) {
+  const out = [];
+  for (const j of state.jobs) for (const p of j.payments) if (dayKey(p.at) === day) out.push({ at: p.at, kind: "in", label: "صيانة", text: `${j.number} — ${j.device} (${j.customer})`, method: p.method, amount: p.amount, job: j.id });
+  for (const x of state.sales) if (dayKey(x.at) === day) out.push({ at: x.at, kind: "sale", label: "بيع", text: x.items.map((i) => i.name + (i.qty > 1 ? " ×" + i.qty : "")).join("، ") + (x.customer ? ` (${x.customer})` : ""), method: x.method, amount: x.total, sale: x.id });
+  for (const x of state.expenses) if (dayKey(x.at) === day) out.push({ at: x.at, kind: "out", label: "مصروف", text: x.category + (x.note ? " — " + x.note : ""), method: x.method, amount: -x.amount, exp: x.id });
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+function cashSummary(day) {
+  const e = cashEntries(day), sum = (k) => e.filter((x) => x.kind === k).reduce((s, x) => s + x.amount, 0);
+  const methods = {};
+  for (const x of e) methods[x.method] = (methods[x.method] || 0) + x.amount;
+  return { e, repairs: sum("in"), sales: sum("sale"), expenses: -sum("out"), net: e.reduce((s, x) => s + x.amount, 0), methods };
+}
+function renderCash() {
+  if (!$("cashDate").value) $("cashDate").value = dayKey(new Date());
+  const s = cashSummary($("cashDate").value);
+  $("cashStats").innerHTML = [["تحصيل الصيانة", s.repairs], ["المبيعات", s.sales], ["المصروفات", s.expenses], ["صافي الصندوق", s.net]].map(([k, v]) => `<article><span class="${k === "المصروفات" && v ? "owe" : ""}">${money(v)}</span><small>${k}</small></article>`).join("");
+  $("cashMethods").textContent = Object.keys(s.methods).length ? "حسب الطريقة: " + Object.entries(s.methods).map(([m, v]) => `${m} ${money(v)}`).join(" · ") : "";
+  $("cashRows").innerHTML = s.e.map((x) => `<tr ${x.job ? `data-job="${x.job}" class="link-row"` : ""}><td>${new Date(x.at).toLocaleTimeString("ar", { hour: "numeric", minute: "2-digit" })}</td><td><span class="kind ${x.kind}">${x.label}</span></td><td>${esc(x.text)}</td><td>${esc(x.method)}</td><td class="${x.amount < 0 ? "amount-out" : ""}"><b>${money(x.amount)}</b></td><td>${x.sale || x.exp ? `<button class="x" data-sale="${x.sale || ""}" data-exp="${x.exp || ""}" title="حذف">×</button>` : ""}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="muted c">لا حركات في هذا اليوم</td></tr>`;
+}
+
+let saleDraft = [];
+function renderSale() {
+  $("saleRows").innerHTML = saleDraft.map((i, n) => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.price * i.qty)}</td><td><button type="button" class="x" data-i="${n}">×</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">أضف صنفاً</td></tr>`;
+  const sub = saleSub(saleDraft), disc = Math.min(sub, num($("saleDiscount").value)), cost = saleCost({ items: saleDraft });
+  $("saleSummary").innerHTML = `<span>المجموع<b>${money(sub)}</b></span><span>الخصم<b>${money(disc)}</b></span><span>الإجمالي<b>${money(sub - disc)}</b></span><span>الربح<b class="${sub - disc - cost < 0 ? "owe" : "gain"}">${money(sub - disc - cost)}</b></span>`;
+}
+function openSale() {
+  saleDraft = []; $("saleForm").reset(); renderSale(); $("saleDialog").showModal(); $("salePick").focus();
+}
+async function saveSale(andPrint) {
+  if (!saleDraft.length) { $("salePick").focus(); return toast("أضف صنفاً واحداً على الأقل", true); }
+  const sub = saleSub(saleDraft), discount = Math.min(sub, num($("saleDiscount").value));
+  const sale = { id: uid(), at: now(), items: saleDraft, discount, total: sub - discount, method: $("saleMethod").value, customer: $("saleCustomer").value.trim() };
+  adjustStock([], sale.items);
+  state.sales.push(sale);
+  await persist(); $("saleDialog").close(); refreshLists(); renderCash();
+  toast(`تم البيع: ${money(sale.total)}`);
+  if (andPrint) printSale(sale);
+}
+function printSale(x) {
+  const st = state.settings;
+  doPrint(`<div class="receipt size-${st.receiptSize}"><header><h1>${esc(st.shopName || "صلّحها")}</h1>${st.shopPhone ? `<p>☎ ${esc(st.shopPhone)}</p>` : ""}</header>
+    <h2>فاتورة بيع</h2><p class="c">${fmtDateTime(x.at)}${x.customer ? " — " + esc(x.customer) : ""}</p>
+    <table>${x.items.map((i) => `<tr><th>${esc(i.name)}${i.qty > 1 ? " ×" + i.qty : ""}</th><td>${money(i.price * i.qty)}</td></tr>`).join("")}</table>
+    <table class="totals">${x.discount ? `<tr><th>الخصم</th><td>${money(x.discount)}</td></tr>` : ""}<tr class="big"><th>الإجمالي</th><td>${money(x.total)}</td></tr><tr><th>الدفع</th><td>${esc(x.method)}</td></tr></table>
+    <p class="c thanks">شكراً لزيارتكم 🌟</p></div>`, st.receiptSize === "a4" ? "size:A4;margin:14mm" : `size:${st.receiptSize}mm auto;margin:3mm`);
+}
+function printZ() {
+  const day = $("cashDate").value, s = cashSummary(day), st = state.settings;
+  doPrint(`<div class="receipt size-${st.receiptSize}"><header><h1>${esc(st.shopName || "صلّحها")}</h1></header><h2>تقرير إغلاق اليوم</h2><p class="c">${fmtDate(day + "T12:00:00")}</p>
+    <table class="totals"><tr><th>تحصيل الصيانة</th><td>${money(s.repairs)}</td></tr><tr><th>المبيعات</th><td>${money(s.sales)}</td></tr><tr><th>المصروفات</th><td>-${money(s.expenses)}</td></tr><tr class="big"><th>صافي الصندوق</th><td>${money(s.net)}</td></tr></table>
+    <table>${Object.entries(s.methods).map(([m, v]) => `<tr><th>${esc(m)}</th><td>${money(v)}</td></tr>`).join("")}</table>
+    <p class="sub">عدد الحركات: ${s.e.length}</p>
+    <table>${s.e.map((x) => `<tr><th>${esc(x.label)}</th><td>${esc(x.text)}<br><b>${money(x.amount)}</b></td></tr>`).join("")}</table>
+    <div class="sign"><div>توقيع المسؤول<span></span></div></div></div>`, st.receiptSize === "a4" ? "size:A4;margin:14mm" : `size:${st.receiptSize}mm auto;margin:3mm`);
+}
 
 /* ---------- المزامنة بين الأجهزة ---------- */
 // كل سجل يُقارن ببصمته عند آخر مزامنة: ما تغيّر يُرفع، وما اختفى يُرسل كمحذوف، ثم نسحب تغييرات الأجهزة الأخرى.
@@ -1003,6 +1126,8 @@ function localRecords() {
   for (const j of state.jobs) m.set("job:" + j.id, j);
   for (const c of state.customers) m.set("customer:" + c.id, c);
   for (const p of state.parts) m.set("part:" + p.id, p);
+  for (const x of state.sales) m.set("sale:" + x.id, x);
+  for (const x of state.expenses) m.set("expense:" + x.id, x);
   m.set("settings:shop", sharedSettings());
   return m;
 }
@@ -1039,6 +1164,7 @@ async function doSync() {
       const r = await api("/api/sync", { since: cfg.rev, device: cfg.device, changes: [] });
       for (const c of r.changes) { await applyRemote(c); pulled++; }
       cfg.rev = r.rev; more = r.more;
+      if (r.deviceCode) cfg.code = r.deviceCode;
     }
   };
   try {
@@ -1093,7 +1219,7 @@ async function applyRemote(c) {
     cfg.hashes[k] = hash(JSON.stringify(sharedSettings()));
     return;
   }
-  const arr = { job: "jobs", customer: "customers", part: "parts" }[c.type];
+  const arr = { job: "jobs", customer: "customers", part: "parts", sale: "sales", expense: "expenses" }[c.type];
   if (!arr) return;
   const i = state[arr].findIndex((x) => x.id === c.id);
   if (c.deleted) { if (i >= 0) state[arr].splice(i, 1); delete cfg.hashes[k]; return; }

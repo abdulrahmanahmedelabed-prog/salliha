@@ -1,7 +1,7 @@
 {
   "name": "salliha",
   "productName": "Salliha",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "صلّحها — إدارة طلبات صيانة الأجهزة",
   "main": "electron/main.js",
   "author": "Salliha",
@@ -12,7 +12,8 @@
     "dist:win": "npm run icons && electron-builder --win --publish never",
     "android:add": "cap add android",
     "android:sync": "cap sync android",
-    "server": "node --no-warnings server/server.js"
+    "server": "node --no-warnings server/server.js",
+    "test": "node --no-warnings --test tests/*.test.js"
   },
   "build": {
     "appId": "com.salliha.app",

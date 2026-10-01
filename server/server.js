@@ -16,7 +16,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const WWW = process.env.WWW_DIR || path.join(__dirname, "..", "www");
 const MAX_BODY = 25 * 1024 * 1024;
 const PAGE_BYTES = 6 * 1024 * 1024;
-const TYPES = new Set(["job", "customer", "part", "settings", "photo"]);
+const TYPES = new Set(["job", "customer", "part", "settings", "photo", "sale", "expense"]);
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, "salliha.db"));
@@ -29,6 +29,7 @@ db.exec(`
     PRIMARY KEY (shop, type, id)
   );
   CREATE INDEX IF NOT EXISTS records_seq ON records (shop, seq);
+  CREATE TABLE IF NOT EXISTS devices (shop TEXT NOT NULL, device TEXT NOT NULL, code INTEGER NOT NULL, seen_at TEXT NOT NULL, PRIMARY KEY (shop, device));
   CREATE INDEX IF NOT EXISTS records_track ON records (track) WHERE track IS NOT NULL;
 `);
 
@@ -41,6 +42,10 @@ const q = {
   // لا نعيد للجهاز ما كتبه هو آخر مرة — عنده بالفعل.
   since: db.prepare("SELECT type, id, seq, data, deleted FROM records WHERE shop = ? AND seq > ? AND (origin IS NULL OR origin != ?) ORDER BY seq LIMIT 500"),
   byTrack: db.prepare("SELECT shop, data FROM records WHERE track = ? AND type = 'job' AND deleted = 0"),
+  device: db.prepare("SELECT code FROM devices WHERE shop = ? AND device = ?"),
+  deviceCount: db.prepare("SELECT COALESCE(MAX(code), 0) AS n FROM devices WHERE shop = ?"),
+  insertDevice: db.prepare("INSERT INTO devices (shop, device, code, seen_at) VALUES (?, ?, ?, ?)"),
+  touchDevice: db.prepare("UPDATE devices SET seen_at = ? WHERE shop = ? AND device = ?"),
   settings: db.prepare("SELECT data FROM records WHERE shop = ? AND type = 'settings' AND id = 'shop' AND deleted = 0")
 };
 
@@ -96,9 +101,15 @@ async function sync(req, res) {
   const changes = Array.isArray(body.changes) ? body.changes : [];
   const now = new Date().toISOString();
   const device = typeof body.device === "string" ? body.device.slice(0, 64) : null;
-  let applied = 0;
+  let applied = 0, deviceCode = 0;
   db.exec("BEGIN IMMEDIATE");
   try {
+    // لكل جهاز رقم ثابت يُستخدم في ترقيم الطلبات حتى لا يتكرر رقم طلب بين جهازين يعملان دون إنترنت.
+    if (device) {
+      deviceCode = q.device.get(shop.id, device)?.code || 0;
+      if (deviceCode) q.touchDevice.run(now, shop.id, device);
+      else { deviceCode = q.deviceCount.get(shop.id).n + 1; q.insertDevice.run(shop.id, device, deviceCode, now); }
+    }
     let seq = q.maxSeq.get(shop.id).s;
     for (const c of changes) {
       if (!TYPES.has(c.type) || typeof c.id !== "string" || !c.id || c.id.length > 80) continue;
@@ -126,7 +137,7 @@ async function sync(req, res) {
   }
   if (!more && rows.length === 500) more = true;
   if (!more) rev = Math.max(rev, q.maxSeq.get(shop.id).s);
-  send(res, 200, { applied, changes: out, rev, more, shopName: shop.name });
+  send(res, 200, { applied, changes: out, rev, more, deviceCode, shopName: shop.name });
 }
 
 /* ---------- صفحة التتبّع ---------- */
