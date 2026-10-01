@@ -31,6 +31,7 @@
       <button data-tab="reports"><span>📊</span>التقارير</button>
       <button data-tab="settings"><span>⚙️</span>الإعدادات</button>
     </nav>
+    <button id="syncBadge" class="sync-badge" hidden title="المزامنة"></button>
     <button id="installBtn" class="ghost sm" hidden>تثبيت</button>
   </header>
 
@@ -101,7 +102,7 @@
           <label>شروط الإيصال<textarea name="terms" rows="3"></textarea></label>
         </fieldset>
         <fieldset><legend>رسائل واتساب لكل حالة</legend>
-          <p class="hint">متغيرات: {الاسم} {الرقم} {الجهاز} {الحالة} {المتبقي} {المحل} {الموعد}</p>
+          <p class="hint">متغيرات: {الاسم} {الرقم} {الجهاز} {الحالة} {السعر} {المتبقي} {المحل} {الموعد} {الرابط} — السطر الذي فيه {الرابط} يُحذف تلقائياً إن لم تكن المزامنة مفعّلة.</p>
           <div id="tplFields"></div>
         </fieldset>
         <fieldset><legend>الأمان</legend>
@@ -109,6 +110,18 @@
         </fieldset>
         <div class="actions"><button class="primary">حفظ الإعدادات</button></div>
       </form>
+      <fieldset class="settings" id="syncBox"><legend>☁️ المزامنة بين الأجهزة وتتبّع العملاء</legend>
+        <p class="hint">اربط كمبيوتر المحل وجوالاتكم على نفس البيانات، وأرسل لكل عميل رابطاً (وQR على الإيصال) يتابع منه حالة جهازه. يتطلب خادم صلّحها — راجع دليل التشغيل في صفحة المشروع.</p>
+        <div id="syncOffBox">
+          <label>عنوان الخادم<input id="syncUrl" inputmode="url" dir="ltr" placeholder="https://salliha.example.com"></label>
+          <div class="actions start"><button id="syncCreate" class="primary">إنشاء حساب للمحل</button><button id="syncJoin" class="ghost">ربط بحساب موجود (لدي رمز)</button></div>
+        </div>
+        <div id="syncOnBox" hidden>
+          <p class="hint">متصل بـ <b id="syncUrlShow" dir="ltr"></b> — <span id="syncStatus"></span></p>
+          <label>رمز المزامنة — أدخله في أجهزتك الأخرى، ولا تشاركه مع أحد<div class="row-add"><input id="syncKeyShow" readonly dir="ltr"><button type="button" class="ghost" id="syncCopy">نسخ</button></div></label>
+          <div class="actions start"><button id="syncNow" class="primary">مزامنة الآن</button><button id="syncDisconnect" class="ghost danger">فصل هذا الجهاز</button></div>
+        </div>
+      </fieldset>
       <fieldset class="settings"><legend>النسخ الاحتياطي والبيانات</legend>
         <p class="hint" id="backupHint">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية أسبوعياً.</p>
         <div class="actions start">
@@ -182,7 +195,7 @@
         <div class="row-add"><input id="logNote" maxlength="200" placeholder="أضف ملاحظة للسجل"><button type="button" class="ghost" id="addLogBtn">إضافة</button></div>
       </div>
 
-      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button type="button" class="ghost" id="saveAndPrint">حفظ وطباعة</button><button class="primary" id="saveBtn">حفظ الطلب</button></div>
+      <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button type="button" class="ghost" id="trackBtn" hidden>🔗 رابط التتبّع</button><button type="button" class="ghost" id="saveAndPrint">حفظ وطباعة</button><button class="primary" id="saveBtn">حفظ الطلب</button></div>
     </form>
   </dialog>
 
@@ -232,6 +245,7 @@
     </article>
   </template>
 
+  <script src="vendor/qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

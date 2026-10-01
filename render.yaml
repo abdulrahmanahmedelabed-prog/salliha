@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: salliha
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: salliha-data
+      mountPath: /data
+      sizeGB: 1

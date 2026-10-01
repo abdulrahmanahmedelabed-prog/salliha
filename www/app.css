@@ -197,6 +197,13 @@ legend { font-weight: 800; padding: 0 6px; }
 .about { color: var(--muted); font-size: 13px; text-align: center; }
 .about kbd { background: var(--soft); border-color: var(--line); }
 
+/* المزامنة */
+.sync-badge { border: 0; background: var(--soft); border-radius: 99px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.sync-badge.ok { color: var(--ok); } .sync-badge.err { color: var(--danger); background: #fee4e2; } .sync-badge.busy { color: var(--green2); }
+.receipt .qr { display: flex; align-items: center; gap: 8px; margin: 8px 0; border: 1px dashed #000; padding: 6px; }
+.receipt .qr svg { width: 26mm; height: 26mm; flex: none; }
+.receipt .qr small { font-size: .9em; }
+
 /* القفل والتنبيهات */
 .lock { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; }
 .lock-box { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 30px; width: min(340px, 90vw); display: flex; flex-direction: column; gap: 12px; text-align: center; }
