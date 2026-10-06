@@ -51,6 +51,7 @@
       </div>
       <div class="toolbar">
         <input id="searchInput" type="search" placeholder="ابحث بالاسم، الهاتف، الجهاز، IMEI أو رقم الطلب  ( / )">
+        <select id="catFilter" aria-label="نوع الجهاز" hidden><option value="">كل الأجهزة</option></select>
         <select id="statusFilter" aria-label="الحالة"><option value="">كل الحالات</option></select>
         <select id="techFilter" aria-label="الفني"><option value="">كل الفنيين</option></select>
         <div class="seg" id="viewSeg"><button data-view="list" class="active">قائمة</button><button data-view="board">لوحة</button></div>
@@ -91,6 +92,7 @@
         <article class="panel"><h3>أكثر الأجهزة</h3><div id="byDevice" class="bars"></div></article>
         <article class="panel"><h3>أكثر الأعطال</h3><div id="byIssue" class="bars"></div></article>
         <article class="panel"><h3>أداء الفنيين</h3><div id="byTech" class="bars"></div></article>
+        <article class="panel" id="byCatPanel" hidden><h3>حسب نوع الجهاز</h3><div id="byCat" class="bars"></div></article>
       </div>
     </section>
 
@@ -100,6 +102,7 @@
         <fieldset><legend>بيانات المحل (تظهر على الإيصال)</legend>
           <div class="grid2">
             <label>اسم المحل<input name="shopName" maxlength="60"></label>
+            <label>نوع المحل<select name="shopType"><option value="phone">📱 جوالات وتابلت</option><option value="laptop">💻 لابتوبات وكمبيوتر</option><option value="electronics">📺 إلكترونيات</option><option value="mixed">🏪 الكل (جوالات + لابتوبات + إلكترونيات)</option></select></label>
             <label>هاتف المحل<input name="shopPhone" maxlength="30" inputmode="tel"></label>
             <label>العنوان<input name="shopAddress" maxlength="120"></label>
             <label>العملة<input name="currency" maxlength="8" placeholder="₪ أو ر.س أو $"></label>
@@ -152,12 +155,14 @@
       <div class="dtabs" id="dtabs"><button type="button" data-d="d-info" class="active">الجهاز والعميل</button><button type="button" data-d="d-check">الفحص والتوقيع</button><button type="button" data-d="d-money">القطع والدفعات</button><button type="button" data-d="d-log">السجل</button></div>
 
       <div class="dpane" id="d-info">
+        <div class="seg cat-seg" id="catSeg" role="radiogroup" aria-label="نوع الجهاز"></div>
         <div class="grid2">
           <label>رقم الهاتف *<input id="phone" required maxlength="24" inputmode="tel" autocomplete="off" list="custList" placeholder="059..."></label>
           <label>اسم العميل *<input id="customer" required maxlength="80" autocomplete="off"></label>
-          <label>نوع الجهاز *<input id="device" required maxlength="100" list="deviceList" placeholder="مثال: Samsung A52"></label>
-          <label>الرقم التسلسلي / IMEI<input id="serial" maxlength="80"></label>
+          <label><span id="deviceLabel">الجهاز / الموديل *</span><input id="device" required maxlength="100" list="deviceList" placeholder="مثال: Samsung A52"></label>
+          <label><span id="serialLabel">الرقم التسلسلي / IMEI</span><input id="serial" maxlength="80"></label>
         </div>
+        <div class="grid4" id="specFields"></div>
         <p id="warrantyHint" class="badge-line" hidden></p>
         <label>العطل كما وصفه العميل *<textarea id="issue" required maxlength="600" rows="2"></textarea></label>
         <div class="chips" id="issueChips"></div>
@@ -180,7 +185,7 @@
         <h4>حالة الجهاز عند الاستلام</h4>
         <div class="chips toggle" id="condChips"></div>
         <div class="grid2">
-          <label>رمز القفل / النمط<input id="passcode" maxlength="40" autocomplete="off" placeholder="مثال: 1234"></label>
+          <label><span id="passLabel">رمز القفل / النمط</span><input id="passcode" maxlength="40" autocomplete="off" placeholder="مثال: 1234"></label>
           <label>ملاحظات داخلية (لا تظهر للعميل)<input id="notes" maxlength="800"></label>
         </div>
         <h4>صور الجهاز</h4>
@@ -256,6 +261,26 @@
         <label>ملاحظة<input id="expNote" maxlength="120"></label>
       </div>
       <div class="actions"><button type="button" class="ghost" data-close>إلغاء</button><button class="primary">حفظ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="welcome" class="wide">
+    <form id="welcomeForm" method="dialog">
+      <div class="c"><span class="logo big">ص</span><h2>أهلاً بك في صلّحها</h2><p class="hint">دقيقة واحدة لتجهيز البرنامج على مقاس محلك.</p></div>
+      <h4>ما نوع محلك؟</h4>
+      <div class="type-cards" id="typeCards">
+        <button type="button" data-type="phone" class="on"><b>📱</b>جوالات وتابلت</button>
+        <button type="button" data-type="laptop"><b>💻</b>لابتوبات وكمبيوتر</button>
+        <button type="button" data-type="electronics"><b>📺</b>إلكترونيات</button>
+        <button type="button" data-type="mixed"><b>🏪</b>الكل</button>
+      </div>
+      <div class="grid3">
+        <label>اسم المحل<input id="wName" maxlength="60" placeholder="مثال: محل النور للصيانة"></label>
+        <label>هاتف المحل<input id="wPhone" maxlength="30" inputmode="tel"></label>
+        <label>العملة<select id="wCurrency"><option value="₪">₪ شيكل</option><option value="ر.س">ر.س ريال سعودي</option><option value="د.إ">د.إ درهم</option><option value="د.أ">د.أ دينار أردني</option><option value="ج.م">ج.م جنيه مصري</option><option value="د.ك">د.ك دينار كويتي</option><option value="ر.ق">ر.ق ريال قطري</option><option value="د.ع">د.ع دينار عراقي</option><option value="$">$ دولار</option><option value="">بدون</option></select></label>
+      </div>
+      <label class="check"><input type="checkbox" id="wDemo"> أضف بيانات تجريبية لأتعرّف على البرنامج</label>
+      <div class="actions"><button class="primary">ابدأ ←</button></div>
     </form>
   </dialog>
 

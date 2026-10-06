@@ -1,13 +1,49 @@
 "use strict";
 /* صلّحها — نظام إدارة محلات الصيانة. يعمل دون إنترنت، والبيانات في IndexedDB على الجهاز. */
 
-const VERSION = "2.2.0";
+const VERSION = "3.0.0";
 const STATUSES = ["تم الاستلام", "قيد الفحص", "انتظار الموافقة", "انتظار قطعة", "قيد التصليح", "جاهز", "تم التسليم", "أُعيد دون تصليح"];
 const CLOSED = ["تم التسليم", "أُعيد دون تصليح"];
 const STATUS_CLASS = ["s-new", "s-check", "s-wait", "s-wait", "s-work", "s-ready", "s-done", "s-back"];
-const ACCESSORIES = ["شاحن", "كابل", "كفر", "شريحة", "ذاكرة", "قلم", "علبة", "بطارية"];
-const CONDITIONS = ["خدوش", "شاشة مكسورة", "ظهر مكسور", "تلف سوائل", "لا يشتغل", "مفتوح سابقاً", "أزرار تالفة", "كاميرا تالفة"];
-const COMMON_ISSUES = ["كسر شاشة", "بطارية", "منفذ الشحن", "لا يشحن", "سوفتوير", "سماعة", "مايك", "كاميرا", "تلف سوائل", "بصمة", "شبكة"];
+// ملف لكل نوع جهاز: الماركات، الأعطال الشائعة، المستلم معه، فحص الاستلام، وحقول إضافية.
+const CATEGORIES = {
+  phone: {
+    label: "جوال", icon: "📱", device: "الجهاز / الموديل *", devicePh: "مثال: Samsung A52", serial: "IMEI / الرقم التسلسلي", pass: "رمز القفل / النمط",
+    brands: ["Samsung", "iPhone", "Xiaomi", "Redmi", "Huawei", "Honor", "Oppo", "Realme", "Vivo", "Infinix", "Tecno", "OnePlus", "Google Pixel", "Nokia", "Motorola"],
+    issues: ["كسر شاشة", "بطارية", "منفذ الشحن", "لا يشحن", "سوفتوير", "سماعة", "مايك", "كاميرا", "تلف سوائل", "بصمة / Face ID", "شبكة", "زجاج خلفي", "أزرار", "حساب جوجل / iCloud"],
+    accessories: ["شاحن", "كابل", "كفر", "شريحة", "ذاكرة", "قلم", "علبة"],
+    conditions: ["خدوش", "شاشة مكسورة", "ظهر مكسور", "تلف سوائل", "لا يشتغل", "مفتوح سابقاً", "أزرار تالفة", "كاميرا تالفة", "إطار معوج"],
+    specs: [{ key: "storage", label: "السعة", ph: "128GB" }, { key: "color", label: "اللون", ph: "أسود" }]
+  },
+  tablet: {
+    label: "تابلت", icon: "📲", device: "الجهاز / الموديل *", devicePh: "مثال: iPad 9 / Galaxy Tab A8", serial: "الرقم التسلسلي / IMEI", pass: "رمز القفل",
+    brands: ["iPad", "Samsung Galaxy Tab", "Lenovo Tab", "Huawei MatePad", "Xiaomi Pad", "Amazon Fire"],
+    issues: ["كسر شاشة", "تاتش لا يعمل", "بطارية", "منفذ الشحن", "لا يشحن", "سوفتوير", "سماعة", "كاميرا", "تلف سوائل", "أزرار", "حساب جوجل / iCloud"],
+    accessories: ["شاحن", "كابل", "كفر", "قلم", "كيبورد", "شريحة", "علبة"],
+    conditions: ["خدوش", "شاشة مكسورة", "ظهر معوج", "تلف سوائل", "لا يشتغل", "مفتوح سابقاً", "أزرار تالفة"],
+    specs: [{ key: "storage", label: "السعة", ph: "64GB" }, { key: "color", label: "اللون", ph: "رمادي" }]
+  },
+  laptop: {
+    label: "لابتوب", icon: "💻", device: "الماركة / الموديل *", devicePh: "مثال: Dell Latitude 5420", serial: "الرقم التسلسلي / Service Tag", pass: "كلمة مرور الدخول (Windows/Mac)",
+    brands: ["Dell", "HP", "Lenovo", "Asus", "Acer", "MacBook", "MSI", "Toshiba", "Microsoft Surface", "Huawei MateBook", "Samsung Galaxy Book", "Gigabyte", "Razer"],
+    issues: ["لا يشتغل", "لا صورة", "كسر شاشة", "كيبورد", "بطارية", "لا يشحن / باور جاك", "سخونة / مروحة", "بطء / فورمات", "ويندوز / تعريفات", "هارد / SSD", "رام", "مفصلات", "لوحة اللمس", "واي فاي", "صوت", "تلف سوائل", "باسورد BIOS", "استعادة بيانات", "ترقية SSD/RAM"],
+    accessories: ["شاحن", "شنطة", "ماوس", "كابل باور", "هارد خارجي", "فلاشة"],
+    conditions: ["خدوش", "شاشة مكسورة", "مفصلات مكسورة", "أزرار كيبورد ناقصة", "تلف سوائل", "براغي ناقصة", "مفتوح سابقاً", "لا يشتغل", "هيكل مكسور", "ملصقات الضمان مفقودة"],
+    specs: [{ key: "cpu", label: "المعالج", ph: "i5-1135G7" }, { key: "ram", label: "الرام", ph: "8GB" }, { key: "storage", label: "التخزين", ph: "256GB SSD" }, { key: "os", label: "النظام", ph: "Windows 11" }, { key: "backup", label: "نسخ البيانات؟", ph: "نعم / لا / غير مهم" }]
+  },
+  electronics: {
+    label: "إلكترونيات", icon: "📺", device: "الجهاز / الماركة / الموديل *", devicePh: "مثال: شاشة Samsung 55 بوصة", serial: "الرقم التسلسلي", pass: "رمز / كلمة مرور (إن وجدت)",
+    brands: ["شاشة Samsung", "شاشة LG", "شاشة Sony", "شاشة TCL", "PlayStation 5", "PlayStation 4", "Xbox Series", "Nintendo Switch", "رسيفر", "راوتر", "طابعة HP", "طابعة Canon", "سماعة JBL", "AirPods", "ساعة ذكية", "كاميرا Canon", "مكبر صوت", "مكيف", "مايكروويف", "مكنسة روبوت"],
+    issues: ["لا يشتغل", "لا صورة", "لا صوت", "باور / بوردة", "إضاءة خلفية", "خطوط في الشاشة", "منفذ HDMI", "لا يقرأ الأسطوانة", "يد التحكم", "سخونة / مروحة", "سوفتوير / تحديث", "لا يشحن", "ريموت", "واي فاي / بلوتوث", "تلف سوائل", "صوت تشويش"],
+    accessories: ["ريموت", "كابل باور", "محوّل", "يد تحكم", "كابل HDMI", "قاعدة / ستاند", "علبة", "بطارية"],
+    conditions: ["خدوش", "شاشة مكسورة", "أجزاء ناقصة", "تلف سوائل", "رائحة حريق", "مفتوح سابقاً", "لا يشتغل", "براغي ناقصة", "هيكل مكسور"],
+    specs: [{ key: "kind", label: "نوع الجهاز", ph: "تلفزيون / بلايستيشن / طابعة…", list: ["تلفزيون / شاشة", "جهاز ألعاب", "رسيفر", "راوتر", "طابعة", "سماعة / مكبر صوت", "ساعة ذكية", "كاميرا", "جهاز منزلي", "أخرى"] }, { key: "size", label: "المقاس / القدرة", ph: "55 بوصة" }]
+  }
+};
+const SHOP_TYPES = { phone: ["phone", "tablet"], laptop: ["laptop"], electronics: ["electronics"], mixed: ["phone", "tablet", "laptop", "electronics"] };
+const shopCats = () => SHOP_TYPES[state.settings.shopType] || SHOP_TYPES.phone;
+const catOf = (j) => CATEGORIES[j?.category] || CATEGORIES.phone;
+const ALL_ISSUES = [...new Set(Object.values(CATEGORIES).flatMap((c) => c.issues))];
 const DEFAULT_TEMPLATES = {
   "تم الاستلام": "مرحباً {الاسم} 👋\nاستلمنا جهازك {الجهاز} برقم طلب {الرقم}.\nسنبلغك فور الانتهاء من الفحص.\nتابع حالة جهازك: {الرابط}\n{المحل}",
   "قيد الفحص": "مرحباً {الاسم}، جهازك {الجهاز} (طلب {الرقم}) قيد الفحص الآن.\n{المحل}",
@@ -19,7 +55,7 @@ const DEFAULT_TEMPLATES = {
   "أُعيد دون تصليح": "مرحباً {الاسم}، نعتذر، لم نتمكن من تصليح {الجهاز} (طلب {الرقم}). يمكنك استلامه في أي وقت.\n{المحل}"
 };
 const DEFAULT_SETTINGS = {
-  shopName: "صلّحها", shopPhone: "", shopAddress: "", currency: "", countryCode: "970", warrantyDays: 30,
+  shopName: "صلّحها", shopType: "phone", onboarded: false, shopPhone: "", shopAddress: "", currency: "", countryCode: "970", warrantyDays: 30,
   receiptSize: "80", techs: [], templates: {}, pinHash: "",
   terms: "• يرجى إحضار هذا الإيصال عند الاستلام.\n• المحل غير مسؤول عن البيانات، ننصح بنسخها احتياطياً.\n• الأجهزة غير المستلمة بعد 60 يوماً من إشعار الجاهزية لا يُسأل عنها المحل.\n• الضمان يشمل القطعة المستبدلة فقط ولا يشمل الكسر أو السوائل."
 };
@@ -111,6 +147,8 @@ function normalizeJob(j) {
   j.payments ||= []; j.parts ||= []; j.history ||= []; j.photos ||= []; j.accessories ||= []; j.conditions ||= [];
   j.priority ||= "عادي"; j.price = Number(j.price) || 0;
   j.track ||= randomToken();
+  j.specs ||= {};
+  if (!CATEGORIES[j.category]) j.category = "phone";
   if (!STATUSES.includes(j.status)) j.status = STATUSES[0];
   return j;
 }
@@ -190,6 +228,11 @@ function refreshLists() {
   fillSelect($("techFilter"), techs, true);
   $("tech").innerHTML = `<option value="">—</option>` + techs.map((t) => `<option>${esc(t)}</option>`).join("");
   $("shopTitle").textContent = state.settings.shopName || "صلّحها";
+  const usedCats = [...new Set([...shopCats(), ...state.jobs.map((j) => j.category)])];
+  $("catFilter").hidden = usedCats.length < 2;
+  const cf = $("catFilter").value;
+  $("catFilter").innerHTML = `<option value="">كل الأجهزة</option>` + usedCats.map((k) => `<option value="${k}">${CATEGORIES[k].icon} ${CATEGORIES[k].label}</option>`).join("");
+  $("catFilter").value = usedCats.includes(cf) ? cf : "";
   $("lockShop").textContent = state.settings.shopName || "صلّحها";
 }
 
@@ -200,18 +243,19 @@ const QUICK_LABEL = { today: "استلام اليوم", active: "قيد العم
 
 function filteredJobs() {
   const q = normalizeDigits($("searchInput").value.trim().toLowerCase());
-  const st = $("statusFilter").value, tech = $("techFilter").value;
+  const st = $("statusFilter").value, tech = $("techFilter").value, cat = $("catFilter").value;
   const today = startOfDay();
   return state.jobs.filter((j) => {
     if (st && j.status !== st) return false;
     if (tech && j.tech !== tech) return false;
+    if (cat && j.category !== cat) return false;
     if (quick === "today" && new Date(j.createdAt) < today) return false;
     if (quick === "active" && (isClosed(j) || j.status === "جاهز")) return false;
     if (quick === "ready" && j.status !== "جاهز") return false;
     if (quick === "late" && !isLate(j)) return false;
     if (quick === "due" && !(dueOf(j) > 0 && j.status !== "أُعيد دون تصليح")) return false;
     if (!q) return true;
-    return [j.number, j.customer, j.phone, j.device, j.serial, j.issue, j.tech].join(" ").toLowerCase().includes(q);
+    return [j.number, j.customer, j.phone, j.device, j.serial, j.issue, j.tech, ...Object.values(j.specs || {})].join(" ").toLowerCase().includes(q);
   }).sort((a, b) => (b.priority === "مستعجل") - (a.priority === "مستعجل") || (isClosed(a) - isClosed(b)) || b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -232,7 +276,7 @@ function jobCard(j) {
   const node = $("jobTemplate").content.firstElementChild.cloneNode(true);
   node.dataset.id = j.id;
   node.querySelector(".job-number").textContent = j.number;
-  node.querySelector(".job-device").textContent = j.device;
+  node.querySelector(".job-device").innerHTML = (shopCats().length > 1 || j.category !== shopCats()[0] ? `<span class="cat-ico" title="${catOf(j).label}">${catOf(j).icon}</span>` : "") + esc(j.device);
   node.querySelector(".job-customer").textContent = `${j.customer} · ${j.phone}`;
   node.querySelector(".job-issue").textContent = j.issue;
   statusPill(node.querySelector(".status-pill"), j.status);
@@ -246,6 +290,7 @@ function jobCard(j) {
   if (j.dueAt && !isClosed(j)) meta.push(`⏰ موعد ${fmtDate(j.dueAt)}`);
   if (j.tech) meta.push(`👤 ${esc(j.tech)}`);
   if (j.photos.length) meta.push(`📷 ${j.photos.length}`);
+  if (specText(j)) meta.push(esc(specText(j)));
   node.querySelector(".meta").innerHTML = meta.map((m) => `<span>${m}</span>`).join("");
   node.querySelector(".job-price").textContent = money(j.price);
   node.querySelector(".job-paid").textContent = money(paidOf(j));
@@ -357,7 +402,8 @@ function doPrint(html, pageCss) {
 
 function receiptHTML(j) {
   const s = state.settings;
-  const rows = [["رقم الطلب", j.number], ["التاريخ", fmtDateTime(j.createdAt)], ["العميل", j.customer], ["الهاتف", j.phone], ["الجهاز", j.device]];
+  const rows = [["رقم الطلب", j.number], ["التاريخ", fmtDateTime(j.createdAt)], ["العميل", j.customer], ["الهاتف", j.phone], [catOf(j).label, j.device]];
+  for (const f of catOf(j).specs) if (j.specs?.[f.key]) rows.push([f.label, j.specs[f.key]]);
   if (j.serial) rows.push(["IMEI / S.N", j.serial]);
   rows.push(["العطل", j.issue]);
   if (j.accessories.length) rows.push(["المستلم معه", j.accessories.join("، ")]);
@@ -406,6 +452,7 @@ function openJob(j, preset = {}) {
   const isNew = !j;
   draft = isNew ? normalizeJob({
     id: uid(), number: nextNumber(), status: STATUSES[0], price: 0, warrantyDays: state.settings.warrantyDays,
+    category: localStorage.getItem("salliha.lastCat") && shopCats().includes(localStorage.getItem("salliha.lastCat")) ? localStorage.getItem("salliha.lastCat") : shopCats()[0],
     createdAt: now(), history: [], ...preset
   }) : structuredClone(j);
   draftNewPhotos = [];
@@ -419,15 +466,29 @@ function openJob(j, preset = {}) {
   $("warrantyDays").value = draft.warrantyDays ?? "";
   $("depositWrap").hidden = !isNew;
   $("trackBtn").hidden = !syncOn();
-  renderChips("accChips", ACCESSORIES, draft.accessories);
-  renderChips("condChips", CONDITIONS, draft.conditions);
-  $("issueChips").innerHTML = COMMON_ISSUES.map((c) => `<button type="button">${c}</button>`).join("");
+  renderCategory();
   renderPhotos(); renderUsed(); renderPayments(); renderTimeline(); loadSignature(draft.signature);
   checkWarranty();
   switchPane("d-info");
   $("jobDialog").showModal();
   (isNew ? $("phone") : $("issue")).focus();
 }
+
+// يعيد رسم كل ما يتغير حسب نوع الجهاز: الماركات، الأعطال، المستلم، الفحص، والحقول الإضافية.
+function renderCategory() {
+  const cats = [...new Set([...shopCats(), draft.category])], c = catOf(draft);
+  $("catSeg").hidden = cats.length < 2;
+  $("catSeg").innerHTML = cats.map((k) => `<button type="button" role="radio" aria-checked="${k === draft.category}" data-cat="${k}" class="${k === draft.category ? "active" : ""}"><span>${CATEGORIES[k].icon}</span>${CATEGORIES[k].label}</button>`).join("");
+  $("deviceLabel").textContent = c.device; $("device").placeholder = c.devicePh;
+  $("serialLabel").textContent = c.serial; $("passLabel").textContent = c.pass;
+  const past = [...new Set(state.jobs.filter((j) => j.category === draft.category).map((j) => j.device).filter(Boolean))].slice(-150);
+  $("deviceList").innerHTML = [...new Set([...past, ...c.brands])].map((d) => `<option value="${esc(d)}">`).join("");
+  $("issueChips").innerHTML = c.issues.map((x) => `<button type="button">${esc(x)}</button>`).join("");
+  renderChips("accChips", c.accessories, draft.accessories);
+  renderChips("condChips", c.conditions, draft.conditions);
+  $("specFields").innerHTML = c.specs.map((f) => `<label>${esc(f.label)}<input data-spec="${f.key}" maxlength="60" placeholder="${esc(f.ph)}" value="${esc(draft.specs[f.key] || "")}"${f.list ? ` list="spec-${f.key}"` : ""}>${f.list ? `<datalist id="spec-${f.key}">${f.list.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : ""}</label>`).join("");
+}
+const specText = (j) => catOf(j).specs.filter((f) => j.specs?.[f.key]).map((f) => `${f.label}: ${j.specs[f.key]}`).join(" · ");
 
 function renderChips(id, items, selected) {
   const extra = selected.filter((s) => !items.includes(s));
@@ -518,9 +579,11 @@ async function saveJob(andPrint = false) {
     customer: $("customer").value.trim(), phone: cleanPhone($("phone").value), device: $("device").value.trim(), serial: $("serial").value.trim(),
     issue: $("issue").value.trim(), priority: $("priority").value, tech: $("tech").value, dueAt: $("dueAt").value, passcode: $("passcode").value.trim(),
     notes: $("notes").value.trim(), price: num($("price").value), warrantyDays: num($("warrantyDays").value),
-    accessories: chipValues("accChips"), conditions: chipValues("condChips"), signature: sigDirty ? $("sigPad").toDataURL("image/png") : sigEmpty ? null : j.signature, updatedAt: now()
+    accessories: chipValues("accChips"), conditions: chipValues("condChips"), category: draft.category,
+    specs: Object.fromEntries([...document.querySelectorAll("#specFields [data-spec]")].map((i) => [i.dataset.spec, i.value.trim()]).filter(([, v]) => v)), signature: sigDirty ? $("sigPad").toDataURL("image/png") : sigEmpty ? null : j.signature, updatedAt: now()
   });
   const newStatus = $("status").value;
+  localStorage.setItem("salliha.lastCat", j.category);
   const cust = upsertCustomer(j.customer, j.phone);
   j.customerId = cust.id;
   if (!old) {
@@ -659,7 +722,10 @@ function renderReports() {
 
   bars($("byStatus"), STATUSES.map((s) => [s, state.jobs.filter((j) => j.status === s && (!isClosed(j) || inP(j.updatedAt))).length]).filter((e) => e[1]));
   bars($("byDevice"), countBy(received, (j) => j.device.split(/\s+/)[0]));
-  bars($("byIssue"), countBy(received.flatMap((j) => COMMON_ISSUES.filter((c) => j.issue.includes(c)).concat(COMMON_ISSUES.some((c) => j.issue.includes(c)) ? [] : ["أخرى"])), (x) => x));
+  bars($("byIssue"), countBy(received.flatMap((j) => { const hits = catOf(j).issues.filter((c) => j.issue.includes(c)); return hits.length ? hits : ["أخرى"]; }), (x) => x));
+  const cats = [...new Set(received.map((j) => j.category))];
+  $("byCatPanel").hidden = cats.length < 2;
+  bars($("byCat"), cats.map((k) => [CATEGORIES[k].icon + " " + CATEGORIES[k].label, received.filter((j) => j.category === k).length]).sort((a, b) => b[1] - a[1]));
   const techMap = new Map();
   for (const j of delivered) { const k = j.tech || "غير محدد"; techMap.set(k, (techMap.get(k) || 0) + 1); }
   bars($("byTech"), [...techMap].sort((a, b) => b[1] - a[1]), (v) => v + " جهاز");
@@ -668,7 +734,7 @@ function renderReports() {
 /* ---------- الإعدادات والنسخ الاحتياطي ---------- */
 function renderSettings() {
   const f = $("settingsForm"), s = state.settings;
-  for (const k of ["shopName", "shopPhone", "shopAddress", "currency", "countryCode", "warrantyDays", "receiptSize", "terms"]) f.elements[k].value = s[k] ?? "";
+  for (const k of ["shopName", "shopType", "shopPhone", "shopAddress", "currency", "countryCode", "warrantyDays", "receiptSize", "terms"]) f.elements[k].value = s[k] ?? "";
   f.elements.techs.value = s.techs.join("، ");
   f.elements.pin.value = "";
   f.elements.pin.placeholder = s.pinHash ? "مفعّل ••••" : "غير مفعّل";
@@ -730,18 +796,27 @@ function exportCSV() {
 
 async function addDemo() {
   const names = [["محمد أحمد", "0599111222"], ["سارة خالد", "0598333444"], ["يوسف علي", "0597555666"], ["ليلى حسن", "0592777888"], ["عمر سعيد", "0569999000"]];
-  const devices = ["Samsung A52", "iPhone 13", "Redmi Note 12", "iPhone 11", "Oppo A74", "Huawei Y9"];
-  const issues = ["كسر شاشة", "بطارية تفرغ بسرعة", "منفذ الشحن لا يعمل", "سوفتوير — يعلق على الشعار", "سماعة المكالمات ضعيفة", "تلف سوائل"];
-  if (!state.parts.length) state.parts.push(
-    { id: uid(), name: "شاشة Samsung A52", sku: "SCR-A52", stock: 3, min: 1, cost: 120, price: 220 },
-    { id: uid(), name: "بطارية iPhone 11", sku: "BAT-IP11", stock: 1, min: 2, cost: 45, price: 110 },
-    { id: uid(), name: "منفذ شحن Type-C", sku: "USB-C", stock: 12, min: 4, cost: 8, price: 40 });
+  const DEMO = {
+    phone: [["Samsung A52", "كسر شاشة"], ["iPhone 13", "بطارية تفرغ بسرعة"], ["Redmi Note 12", "منفذ الشحن لا يعمل"], ["iPhone 11", "سوفتوير — يعلق على الشعار"], ["Oppo A74", "سماعة المكالمات ضعيفة"]],
+    tablet: [["iPad 9", "كسر شاشة"], ["Galaxy Tab A8", "لا يشحن"]],
+    laptop: [["Dell Latitude 5420", "سخونة / مروحة — يطفئ وحده", { cpu: "i5-1135G7", ram: "8GB", storage: "256GB SSD", os: "Windows 11" }], ["HP Pavilion 15", "كيبورد — أزرار لا تعمل", { ram: "16GB" }], ["MacBook Air M1", "تلف سوائل", { storage: "256GB" }], ["Lenovo IdeaPad 3", "بطء / فورمات + ترقية SSD/RAM", { ram: "4GB", storage: "1TB HDD" }]],
+    electronics: [["شاشة Samsung 55", "لا صورة — إضاءة خلفية", { kind: "تلفزيون / شاشة", size: "55 بوصة" }], ["PlayStation 5", "منفذ HDMI", { kind: "جهاز ألعاب" }], ["طابعة HP 2320", "لا تسحب الورق", { kind: "طابعة" }], ["سماعة JBL Flip 5", "لا يشحن", { kind: "سماعة / مكبر صوت" }]]
+  };
+  const pool = shopCats().flatMap((c) => DEMO[c].map((d) => [c, ...d]));
+  const DEMO_PARTS = {
+    phone: [["شاشة Samsung A52", "SCR-A52", 3, 1, 120, 220], ["بطارية iPhone 11", "BAT-IP11", 1, 2, 45, 110], ["منفذ شحن Type-C", "USB-C", 12, 4, 8, 40], ["كفر سيليكون", "CASE", 20, 5, 5, 25]],
+    tablet: [["شاشة iPad 9", "SCR-IPAD9", 1, 1, 160, 300]],
+    laptop: [["SSD 512GB", "SSD-512", 5, 2, 120, 200], ["رام DDR4 8GB", "RAM-8", 6, 2, 70, 120], ["كيبورد Dell 5420", "KB-D5420", 1, 1, 60, 130], ["شاحن لابتوب 65W", "CHG-65", 4, 2, 40, 90]],
+    electronics: [["بار إضاءة خلفية 55", "LED-55", 2, 1, 90, 200], ["منفذ HDMI PS5", "HDMI-PS5", 3, 1, 15, 80], ["باور سبلاي عام", "PSU", 2, 1, 50, 120]]
+  };
+  if (!state.parts.length) for (const c of shopCats()) for (const [name, sku, stock, min, cost, price] of DEMO_PARTS[c]) state.parts.push({ id: uid(), name, sku, stock, min, cost, price });
   for (let i = 0; i < 9; i++) {
     const [name, phone] = names[i % names.length], c = upsertCustomer(name, phone);
     const created = new Date(Date.now() - (i * 2.3 + 0.2) * DAY).toISOString();
     const status = STATUSES[[0, 1, 4, 5, 6, 6, 3, 2, 6][i]];
     const price = [180, 250, 90, 300, 120, 220, 60, 150, 110][i];
-    const j = normalizeJob({ id: uid(), number: nextNumber(), customerId: c.id, customer: name, phone, device: devices[i % devices.length], serial: "", issue: issues[i % issues.length],
+    const [category, device, issue, specs = {}] = pool[i % pool.length];
+    const j = normalizeJob({ id: uid(), number: nextNumber(), customerId: c.id, customer: name, phone, device, serial: "", issue, category, specs,
       status, priority: i === 2 ? "مستعجل" : "عادي", tech: state.settings.techs[i % (state.settings.techs.length || 1)] || "", dueAt: new Date(Date.parse(created) + 2 * DAY).toISOString().slice(0, 10),
       price, warrantyDays: 30, accessories: i % 2 ? ["شاحن"] : [], conditions: i % 3 ? [] : ["خدوش"], createdAt: created, updatedAt: created,
       payments: [{ id: uid(), amount: status === "تم التسليم" ? price : 50, method: "نقداً", at: created }],
@@ -763,7 +838,7 @@ function bind() {
     draftNewPhotos = [];
   });
 
-  ["searchInput", "statusFilter", "techFilter"].forEach((id) => $(id).addEventListener("input", renderJobs));
+  ["searchInput", "statusFilter", "techFilter", "catFilter"].forEach((id) => $(id).addEventListener("input", renderJobs));
   document.querySelector("#tab-jobs .stats").addEventListener("click", (e) => { const a = e.target.closest("[data-quick]"); if (a) { quick = quick === a.dataset.quick ? "" : a.dataset.quick; renderJobs(); } });
   $("quickNote").addEventListener("click", (e) => { if (e.target.id === "clearQuick") { quick = ""; renderJobs(); } });
   $("viewSeg").addEventListener("click", (e) => {
@@ -803,6 +878,27 @@ function bind() {
   });
 
   // نافذة الطلب
+  $("catSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cat]"); if (!b || b.dataset.cat === draft.category) return;
+    // نحفظ ما كُتب في الحقول قبل إعادة الرسم
+    draft.accessories = chipValues("accChips"); draft.conditions = chipValues("condChips");
+    document.querySelectorAll("#specFields [data-spec]").forEach((i) => { if (i.value.trim()) draft.specs[i.dataset.spec] = i.value.trim(); });
+    draft.category = b.dataset.cat; renderCategory();
+  });
+  $("typeCards").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-type]"); if (!b) return;
+    $("typeCards").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  });
+  $("welcomeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const s = state.settings;
+    s.shopType = $("typeCards").querySelector(".on").dataset.type;
+    if ($("wName").value.trim()) s.shopName = $("wName").value.trim();
+    s.shopPhone = $("wPhone").value.trim(); s.currency = $("wCurrency").value; s.onboarded = true;
+    await persist(); $("welcome").close(); refreshLists();
+    if ($("wDemo").checked) await addDemo(); else renderJobs();
+    toast(`جاهز! اضغط «استلام جهاز» لتسجيل أول ${CATEGORIES[shopCats()[0]].label}`);
+  });
   $("dtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) switchPane(b.dataset.d); });
   $("jobForm").addEventListener("submit", (e) => { e.preventDefault(); saveJob(); });
   $("saveAndPrint").addEventListener("click", () => saveJob(true));
@@ -987,7 +1083,7 @@ function bind() {
   $("settingsForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target.elements, s = state.settings;
-    for (const k of ["shopName", "shopPhone", "shopAddress", "currency", "countryCode", "receiptSize", "terms"]) s[k] = f[k].value.trim();
+    for (const k of ["shopName", "shopType", "shopPhone", "shopAddress", "currency", "countryCode", "receiptSize", "terms"]) s[k] = f[k].value.trim();
     s.warrantyDays = Math.round(num(f.warrantyDays.value));
     s.techs = f.techs.value.split(/[,،]/).map((x) => x.trim()).filter(Boolean);
     s.templates = {};
@@ -1110,7 +1206,7 @@ const syncCfg = () => (state.sync ||= { url: "", key: "", rev: 0, hashes: {}, la
 const syncOn = () => !!(state.sync?.url && state.sync?.key);
 const baseURL = () => syncCfg().url.trim().replace(/\/+$/, "");
 const trackURL = (j) => (syncOn() && j.track ? `${baseURL()}/t/${j.track}` : "");
-let syncTimer = null, syncRunning = false, syncAgain = false, syncError = "";
+let syncTimer = null, syncRunning = false, syncError = "";
 
 function hash(str) { // cyrb53
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -1151,9 +1247,15 @@ function scheduleSync(delay = 3000) {
   syncTimer = setTimeout(() => doSync(), delay);
 }
 
+// إن كانت مزامنة جارية ننتظرها ثم نزامن من جديد، فيضمن المستدعي أن تعديلاته رُفعت عند انتهاء الوعد.
+let syncCurrent = null;
 async function doSync() {
   if (!syncOn()) return;
-  if (syncRunning) { syncAgain = true; return; }
+  if (syncCurrent) { await syncCurrent.catch(() => {}); return doSync(); }
+  syncCurrent = runSync();
+  try { await syncCurrent; } finally { syncCurrent = null; }
+}
+async function runSync() {
   if (!navigator.onLine) { syncError = "غير متصل بالإنترنت"; renderSyncBadge(); return; }
   syncRunning = true; renderSyncBadge();
   const cfg = syncCfg();
@@ -1203,7 +1305,7 @@ async function doSync() {
     syncRunning = false;
     renderSyncBadge();
     if (currentTab === "settings") renderSyncSettings();
-    if (syncAgain) { syncAgain = false; scheduleSync(500); }
+
   }
 }
 
@@ -1301,6 +1403,8 @@ async function unlock() {
   refreshLists();
   renderJobs();
   renderSyncBadge();
+  if (!state.settings.onboarded && !state.jobs.length && !syncOn()) { $("wName").value = ""; $("welcome").showModal(); }
+  else if (!state.settings.onboarded) { state.settings.onboarded = true; persist(); }
   doSync();
   setInterval(() => document.visibilityState === "visible" && doSync(), 30000);
   window.addEventListener("online", () => scheduleSync(500));

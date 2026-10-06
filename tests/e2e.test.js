@@ -27,6 +27,7 @@ async function device(opts = {}) {
   p.on("dialog", (d) => (d.message().includes("واتساب") ? d.dismiss() : d.accept(d.type() === "prompt" ? p.promptAnswer || "" : undefined)));
   await p.addInitScript(() => { window.print = () => { window.__printed = document.getElementById("printRoot").innerHTML; }; });
   await p.goto(base);
+  if (!opts.keepWelcome) { await p.waitForSelector("#welcome[open]"); await p.$eval("#welcomeForm .primary", (e) => e.click()); await p.waitForFunction(() => !$("welcome").open); }
   return p;
 }
 const ev = (p, fn, arg) => p.evaluate(fn, arg);
@@ -67,7 +68,9 @@ test("full shop workflow", async () => {
   await p.click("[data-tab=cash]"); await p.click("#newSaleBtn");
   await p.fill("#salePick", "شاشة A52"); await p.dispatchEvent("#salePick", "change"); await p.click("#saleAdd");
   await p.fill("#saleDiscount", "20"); await p.click("#saleForm .primary");
+  await p.waitForFunction(() => state.sales.length === 1 && !$("saleDialog").open);
   await p.click("#newExpBtn"); await p.fill("#expAmount", "30"); await p.click("#expForm .primary");
+  await p.waitForFunction(() => state.expenses.length === 1 && !$("expDialog").open);
   const cash = await p.textContent("#cashStats");
   assert.match(cash, /50/); assert.match(cash, /180/); assert.match(cash, /30/); assert.match(cash, /200/, "net = 50 + 180 - 30");
   assert.equal(await ev(p, () => state.parts[0].stock), 1, "sale decremented stock");
@@ -95,8 +98,8 @@ test("two devices sync, unique job numbers, tracking page", async () => {
 
   const B = await device(); B.promptAnswer = key;
   await B.click("[data-tab=settings]"); await B.fill("#syncUrl", base); await B.click("#syncJoin");
-  await B.waitForFunction(() => state.sync?.code === 2);
-  assert.equal(await B.textContent("#shopTitle"), "محل المزامنة", "joining device keeps shop settings");
+  await B.waitForFunction(() => state.sync?.code === 2 && !syncRunning);
+  await B.waitForFunction(() => $("shopTitle").textContent === "محل المزامنة", null, { timeout: 5000 });
 
   // الجهازان ينشئان طلباً — أرقام مختلفة
   for (const [p, name] of [[A, "علي"], [B, "منى"]]) {
@@ -122,6 +125,43 @@ test("two devices sync, unique job numbers, tracking page", async () => {
   assert.match(html, /جهازك جاهز/); assert.match(html, /محل المزامنة/);
   assert.ok(await ev(A, (id) => receiptHTML(state.jobs.find((j) => j.id === id)).includes('class="qr"'), aliJob), "QR on receipt");
   await A.context().close(); await B.context().close();
+});
+
+test("welcome screen and shop types: laptop and electronics", async () => {
+  const p = await device({ keepWelcome: true });
+  await p.waitForSelector("#welcome[open]");
+  await p.click("[data-type=mixed]"); await p.fill("#wName", "مركز التقنية"); await p.selectOption("#wCurrency", "ر.س");
+  await p.click("#welcomeForm .primary");
+  await p.waitForFunction(() => !$("welcome").open);
+  assert.equal(await ev(p, () => state.settings.shopType), "mixed");
+  assert.equal(await p.textContent("#shopTitle"), "مركز التقنية");
+
+  await p.click("#newJobBtn");
+  assert.equal(await p.locator("#catSeg button").count(), 4, "all device types offered");
+  await p.click("[data-cat=laptop]");
+  assert.match(await p.textContent("#issueChips"), /سخونة \/ مروحة/);
+  assert.match(await p.textContent("#accChips"), /شنطة/);
+  await p.fill("#phone", "0501234567"); await p.fill("#customer", "خالد"); await p.fill("#device", "Dell Latitude 5420"); await p.fill("#issue", "سخونة / مروحة");
+  await p.fill("[data-spec=cpu]", "i7-1185G7"); await p.fill("[data-spec=ram]", "16GB");
+  await p.click("#saveBtn"); await p.waitForFunction(() => state.jobs.length === 1);
+  const j = await ev(p, () => state.jobs[0]);
+  assert.equal(j.category, "laptop"); assert.deepEqual(j.specs, { cpu: "i7-1185G7", ram: "16GB" });
+  assert.match(await ev(p, () => receiptHTML(state.jobs[0])), /المعالج<\/th><td>i7-1185G7/);
+  assert.match(await p.textContent(".job-card .meta"), /الرام: 16GB/);
+
+  await p.click("#newJobBtn");
+  assert.equal(await ev(p, () => draft.category), "laptop", "remembers last device type");
+  await p.click("[data-cat=electronics]");
+  assert.match(await p.textContent("#issueChips"), /إضاءة خلفية/);
+  await p.fill("#phone", "0507654321"); await p.fill("#customer", "ريم"); await p.fill("#device", "PlayStation 5"); await p.fill("#issue", "منفذ HDMI"); await p.fill("[data-spec=kind]", "جهاز ألعاب");
+  await p.click("#saveBtn"); await p.waitForFunction(() => state.jobs.length === 2);
+
+  await p.selectOption("#catFilter", "electronics");
+  assert.equal(await p.locator(".job-card").count(), 1);
+  assert.match(await p.textContent(".job-card"), /PlayStation 5/);
+  await p.click("[data-tab=reports]");
+  assert.ok(await p.isVisible("#byCatPanel"));
+  await p.context().close();
 });
 
 test("mobile layout has no horizontal overflow", async () => {
